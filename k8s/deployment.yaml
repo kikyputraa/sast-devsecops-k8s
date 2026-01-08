@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-devops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-devops
+  template:
+    metadata:
+      labels:
+        app: hello-devops
+    spec:
+      containers:
+      - name: hello-devops
+        image: kikyputraa/hello-devops:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
