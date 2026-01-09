@@ -6,18 +6,18 @@ stages:
 
 variables:
   DOCKER_IMAGE: $DOCKER_USER/sast-scan-test
-  # Menggunakan commit SHA agar setiap build punya versi unik di K8s
-  IMAGE_TAG: $CI_COMMIT_SHORT_SHA 
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
 
-# 1. SAST (Security Scan)
+# 1. Tahap Scan Keamanan
 sast_scan:
   stage: sast
   image: python:3.9-slim
   script:
     - pip install bandit
     - bandit -r app/
+  allow_failure: false
 
-# 2. BUILD
+# 2. Tahap Build Image
 build_job:
   stage: build
   image: docker:20.10.16
@@ -31,7 +31,7 @@ build_job:
       - app_image.tar
     expire_in: 1 hour
 
-# 3. PUSH
+# 3. Tahap Push ke Docker Hub
 push_job:
   stage: push
   image: docker:20.10.16
@@ -41,20 +41,42 @@ push_job:
     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
   script:
     - docker load < app_image.tar
-    - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:$IMAGE_TAG
+    - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 4. DEPLOY (Kubernetes)
-deploy_to_k8s:
+# 4a. Tahap Deploy ke STAGING
+deploy_staging:
   stage: deploy
   image: 
-    name: alpine:latest # Menggunakan alpine karena ringan dan punya sed
+    name: alpine:latest
     entrypoint: [""]
   script:
-    - echo "--- UPDATE IMAGE DI MANIFEST ---"
-    - 'sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml'
-    - cat k8s/deployment.yaml | grep "image:" # Menampilkan hasil perubahan untuk verifikasi log
-    - echo "Manifes berhasil diupdate secara lokal di pipeline."
-  only:
-    - main
+    - echo "--- KONFIGURASI STAGING ---"
+    # Mengubah namespace menjadi staging
+    - sed -i 's/namespace:.*/namespace: staging/g' k8s/deployment.yaml
+    - sed -i 's/namespace:.*/namespace: staging/g' k8s/service.yml
+    # Mengubah NodePort agar tidak konflik (30001 -> 30002)
+    - sed -i 's/nodePort: 30001/nodePort: 30002/g' k8s/service.yml
+    # Update Image Tag
+    - sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
+    - echo "Manifest Staging siap. Silakan jalankan kubectl apply -f k8s/ -n staging di WSL."
+  rules:
+    - if: $CI_COMMIT_BRANCH == "staging"
+
+# 4b. Tahap Deploy ke PRODUCTION
+deploy_production:
+  stage: deploy
+  image: 
+    name: alpine:latest
+    entrypoint: [""]
+  script:
+    - echo "--- KONFIGURASI PRODUCTION ---"
+    # Memastikan namespace tetap default (atau production)
+    - sed -i 's/namespace:.*/namespace: default/g' k8s/deployment.yaml
+    - sed -i 's/namespace:.*/namespace: default/g' k8s/service.yml
+    # Update Image Tag
+    - sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
+    - echo "Manifest Production siap. Silakan jalankan kubectl apply -f k8s/ di WSL."
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
