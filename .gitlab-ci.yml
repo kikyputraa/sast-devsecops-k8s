@@ -50,10 +50,11 @@ deploy_to_k8s:
   stage: deploy
   image: 
     name: bitnami/kubectl:latest
-    entrypoint: [""] # Tambahkan baris ini
+    entrypoint: [""]
   script:
     - echo "--- VALIDASI MANIFEST ---"
-    - kubectl apply --dry-run=client -f k8s/
+    # Menambahkan --validate=false agar tidak mencari cluster
+    - kubectl apply --dry-run=client --validate=false -f k8s/
     - echo "--- UPDATE IMAGE DI MANIFEST ---"
     - 'sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml'
     - echo "Deployment divalidasi dengan aman."
