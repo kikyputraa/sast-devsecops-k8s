@@ -4,22 +4,25 @@ stages:
   - push
   - deploy
 
-# 1. Tahap SAST (Static Analysis Security Testing)
+# 1. Tahap Keamanan (SAST)
 sast_scan:
   stage: sast
   image: python:3.9-slim
   script:
     - pip install bandit
-    - bandit -r . # Memeriksa celah keamanan pada kode python
+    - bandit -r . 
 
-# 2. Tahap Build & Push
+# 2. Tahap Build & Push ke Docker Hub
 build_and_push:
   stage: build
   image: docker:20.10.16
   services:
     - docker:20.10.16-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
   script:
-    - docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
     - docker build -t $DOCKER_USER/python-app:latest .
     - docker push $DOCKER_USER/python-app:latest
 
@@ -27,8 +30,7 @@ build_and_push:
 deploy_app:
   stage: deploy
   script:
-    - echo "Menarik image terbaru dari Docker Hub..."
-    - echo "Menjalankan perintah: docker-compose up -d"
-    - echo "Aplikasi berhasil di-deploy!"
+    - echo "Menarik image terbaru: $DOCKER_USER/python-app:latest"
+    - echo "Aplikasi berhasil di-deploy ke environment target."
   only:
     - main
