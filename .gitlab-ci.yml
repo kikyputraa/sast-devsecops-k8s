@@ -48,15 +48,14 @@ push_job:
 # 4. DEPLOY (Kubernetes)
 deploy_to_k8s:
   stage: deploy
-  image: bitnami/kubectl:latest
+  image: 
+    name: bitnami/kubectl:latest
+    entrypoint: [""] # Tambahkan baris ini
   script:
     - echo "--- VALIDASI MANIFEST ---"
     - kubectl apply --dry-run=client -f k8s/
     - echo "--- UPDATE IMAGE DI MANIFEST ---"
-    # Gunakan tanda kutip tunggal untuk membungkus perintah sed yang kompleks
     - 'sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml'
-    - echo "Deployment berhasil divalidasi. Siap dideploy ke Minikube."
-    - echo "Jalankan perintah ini di WSL Anda:"
-    - echo "git pull origin main && kubectl apply -f k8s/"
+    - echo "Deployment divalidasi dengan aman."
   only:
     - main
