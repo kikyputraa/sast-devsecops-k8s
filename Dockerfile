@@ -1,6 +1,12 @@
 FROM python:3.9-slim
 WORKDIR /app
-COPY requirements.txt .
+
+# Ambil requirements dari dalam folder app
+COPY app/requirements.txt .
 RUN pip install -r requirements.txt
+
+# Salin semua file
 COPY . .
-CMD ["python", "app.py"]
+
+# Jalankan aplikasi (pastikan path benar)
+CMD ["python", "app/app.py"]
