@@ -6,64 +6,78 @@ stages:
   - deploy
 
 variables:
-  DOCKER_IMAGE: "docker.io/${DOCKER_USER}/sast-scan-test"
-  IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  DOCKER_USER: "kikyputraa"
+  DOCKER_IMAGE: $DOCKER_USER/sast-scan-test
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
 
-# 1. Tahap SAST (Static Analysis)
+# 1. Tahap Scan Kode (SAST) - Berjalan di GitLab
 sast_bandit:
   stage: sast
   image: python:3.9-slim
   script:
     - pip install bandit
-    - bandit -r . -f json -o bandit-report.json
-  artifacts:
-    when: always
-    paths:
-      - bandit-report.json
+    - bandit -r app/
+  allow_failure: false
 
-# 2. Tahap Build Image Lokal
-build_image:
+# 2. Tahap Build Image - Membuat file .tar untuk di-scan
+build_job:
   stage: build
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
   script:
-    - docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} .
-    - docker save ${DOCKER_IMAGE}:${IMAGE_TAG} > image.tar
+    - docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
+    - docker save $DOCKER_IMAGE:$IMAGE_TAG > app_image.tar
   artifacts:
     paths:
-      - image.tar
+      - app_image.tar
+    expire_in: 1 hour
 
-# 3. Tahap Trivy (Vulnerability Scanning)
+# 3. Tahap Scan Image (Trivy) - Berjalan di GitLab
 trivy_scan:
   stage: security_check
   image: 
     name: aquasec/trivy:latest
     entrypoint: [""]
   script:
-    - trivy image --input image.tar --severity HIGH,CRITICAL --exit-code 1
-  # Pipeline akan GAGAL (stop) jika ditemukan celah HIGH atau CRITICAL
+    - echo "Memeriksa kerentanan image..."
+    # Exit code 1 akan menghentikan pipeline jika ditemukan celah HIGH atau CRITICAL
+    - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1
+  dependencies:
+    - build_job
 
-# 4. Tahap Push ke Registry
-push_registry:
+# 4. Tahap Push ke Docker Hub - Hanya jalan jika Trivy Aman
+push_job:
   stage: push
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
-  script:
-    - docker load < image.tar
+  needs: ["trivy_scan"]
+  before_script:
     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
-    - docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
-    - docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_IMAGE}:latest
-    - docker push ${DOCKER_IMAGE}:latest
-
-# 5. Tahap Deploy ke Kubernetes
-deploy_k8s:
-  stage: deploy
-  image: bitnami/kubectl:latest
   script:
-    - kubectl config use-context path/to/your/context
-    - sed -i "s|image:.*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|g" k8s/deployment.yaml
-    - kubectl apply -f k8s/deployment.yaml -n staging
-  only:
-    - main
+    - docker load < app_image.tar
+    - docker push $DOCKER_IMAGE:$IMAGE_TAG
+    - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
+    - docker push $DOCKER_IMAGE:latest
+
+# 5. Tahap Update Manifest (Deploy)
+deploy_job:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        NAMESPACE="default"
+        PORT="30001"
+      else
+        NAMESPACE="staging"
+        PORT="30002"
+      fi
+    - sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
+    - sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
+    - sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
+    - sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
+    - echo "Manifest updated for $NAMESPACE environment."
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"
