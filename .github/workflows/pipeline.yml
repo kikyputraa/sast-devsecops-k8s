@@ -7,8 +7,9 @@ on:
     branches: [ "main", "staging" ]
 
 jobs:
-  sast:
-    name: Security Scanning
+  # 1. SAST & SonarCloud Scan
+  security_scan:
+    name: SAST & SonarCloud
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -16,12 +17,7 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Run Bandit (SAST)
+      - name: Run Bandit (Python SAST)
         run: |
           pip install bandit
           bandit -r app/ || echo "Issues found"
@@ -29,27 +25,28 @@ jobs:
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v3
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION_KEY }}
-            -Dsonar.sources=.
-            -Dsonar.python.version=3
 
+  # 2. Build & Push to Docker Hub
   build-and-push:
     name: Build and Push
-    needs: sast
+    needs: security_scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Build and Push
+
+      - name: Build and Push Image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -58,27 +55,34 @@ jobs:
             ${{ secrets.DOCKER_USER }}/sast-scan-test:${{ github.sha }}
             ${{ secrets.DOCKER_USER }}/sast-scan-test:latest
 
-  deploy-config:
-    name: Update Manifests
+  # 3. Deploy Configuration (Update Manifests)
+  deploy-update:
+    name: Update K8s Manifests
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Configure Manifests
+
+      - name: Update Deployment & Service
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
-            NAMESPACE="staging"
-            PORT="30002"
-          else
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             NAMESPACE="default"
             PORT="30001"
+          else
+            NAMESPACE="staging"
+            PORT="30002"
           fi
+          
+          # Update Namespace & Image
           sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
           sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
           sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
           sed -i "s|image:.*|image: ${{ secrets.DOCKER_USER }}/sast-scan-test:${{ github.sha }}|g" k8s/deployment.yaml
-      - name: Upload Artifact
+          
+          echo "Manifests updated for $NAMESPACE environment."
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: k8s-manifests
+          name: updated-k8s-manifests
           path: k8s/

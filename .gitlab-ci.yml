@@ -19,7 +19,7 @@ sast_bandit:
     - 'bandit -r app/'
   allow_failure: false
 
-ssonarqube_check:
+sonarqube_check:
   stage: sast
   image: 
     name: sonarsource/sonar-scanner-cli:latest

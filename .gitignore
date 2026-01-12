@@ -1,0 +1,6 @@
+# Mengabaikan file konfigurasi SonarCloud
+sonar-project.properties
+
+# Mengabaikan folder hasil scan (jika ada)
+.sonar/
+.scannerwork/
