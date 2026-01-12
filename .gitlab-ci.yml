@@ -9,6 +9,8 @@ variables:
   DOCKER_USER: "kikyputraa"
   DOCKER_IMAGE: $DOCKER_USER/sast-scan-test
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  # Gunakan host.docker.internal agar container di dalam WSL bisa memanggil localhost WSL
+  SONAR_HOST_URL: "http://host.docker.internal:9000"
 
 # 1. SAST
 sast_bandit:
@@ -18,6 +20,20 @@ sast_bandit:
     - pip install bandit
     - bandit -r app/
   allow_failure: false
+
+# Job Baru: Scan SonarQube menggunakan Runner Lokal
+sonarqube_check:
+  stage: sast
+  image: sonarsource/sonar-scanner-cli:latest
+  tags:
+    - wsl-local  # SESUAIKAN dengan tag yang Anda buat di GitLab Web
+  script:
+    - sonar-scanner 
+      -Dsonar.projectKey=sast-project 
+      -Dsonar.sources=. 
+      -Dsonar.host.url=$SONAR_HOST_URL 
+      -Dsonar.login=$SONAR_TOKEN
+  allow_failure: true
 
 # 2. Build
 build_job:
@@ -39,10 +55,10 @@ trivy_scan:
   image: 
     name: aquasec/trivy:latest
     entrypoint: [""]
-  script:
-    - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1
   dependencies:
     - build_job
+  script:
+    - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1
 
 # 4. Push
 push_job:
@@ -50,14 +66,10 @@ push_job:
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
-  # TAMBAHKAN INI: Memastikan file dari build_job didownload
-  dependencies:
-    - build_job
-  # Atau gunakan needs agar lebih cepat
   needs:
     - job: build_job
       artifacts: true
-    - job: trivy_scan  # Pastikan scan lulus dulu baru push
+    - job: trivy_scan
   before_script:
     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
   script:
@@ -66,7 +78,7 @@ push_job:
     - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 5. Deploy (Perbaikan Sintaks Script)
+# 5. Deploy
 deploy_job:
   stage: deploy
   image: alpine:latest
