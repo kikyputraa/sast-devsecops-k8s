@@ -2,6 +2,10 @@
 
 Proyek ini mendemonstrasikan implementasi alur kerja **DevSecOps** modern untuk aplikasi berbasis Python Flask. Sistem ini mengintegrasikan pemindaian keamanan otomatis, containerization, dan manajemen multi-environment (Staging & Production) menggunakan GitLab CI/CD dan Kubernetes.
 
+## !Update
+- (12/01) Migrating SonarQube to SonarCloud.
+- (12/01) Adding Trivy Image Scan.
+
 ## 🚀 Fitur Utama
 
 - **SAST (Static Application Security Testing):** Pemindaian kode otomatis menggunakan `Bandit` untuk mendeteksi celah keamanan sebelum proses build.
