@@ -20,7 +20,7 @@ sast_bandit:
     - bandit -r app/
   allow_failure: false
 
-# Job Scan SonarCloud
+# Job Scan SonarCloud (Membaca sonar-project.properties)
 sonarqube_check:
   stage: sast
   image: 
@@ -36,11 +36,7 @@ sonarqube_check:
   tags:
     - assistx
   script:
-    - sonar-scanner 
-      -Dsonar.projectKey=$SONAR_PROJECT_KEY 
-      -Dsonar.organization=$SONAR_ORG_KEY
-      -Dsonar.host.url=$SONAR_HOST_URL 
-      -Dsonar.login=$SONAR_TOKEN
+    - sonar-scanner -Dsonar.login=$SONAR_TOKEN
   allow_failure: true
 
 # 2. Build
@@ -86,7 +82,7 @@ push_job:
     - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 5. Deploy (Perbaikan Error "Nested Array")
+# 5. Deploy (Perbaikan Error Script)
 deploy_job:
   stage: deploy
   image: alpine:latest
