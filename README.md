@@ -1,26 +1,30 @@
 # Flask DevSecOps Pipeline with Kubernetes
 
-Proyek ini mendemonstrasikan implementasi alur kerja **DevSecOps** modern untuk aplikasi berbasis Python Flask. Sistem ini mengintegrasikan pemindaian keamanan otomatis, containerization, dan manajemen multi-environment (Staging & Production) menggunakan GitLab CI/CD dan Kubernetes.
+Proyek ini mendemonstrasikan implementasi alur kerja **DevSecOps** modern untuk aplikasi berbasis Python Flask. Sistem ini mengintegrasikan pemindaian keamanan otomatis tingkat lanjut, containerization, dan manajemen multi-environment menggunakan dual-platform CI/CD (GitLab & GitHub Actions).
 
-## !Update
-- (12/01) Migrating SonarQube to SonarCloud.
-- (12/01) Adding Trivy Image Scan.
+## 🆕 Update Terbaru
+- **Migrasi SonarCloud:** Integrasi pemindaian kualitas kode dan keamanan menggunakan SonarCloud dengan sistem *Secret Token*.
+- **Dual-CI/CD Workflow:** Mendukung GitHub Actions dan GitLab CI/CD secara bersamaan untuk fleksibilitas platform.
+- **Vulnerability Scanning:** Penambahan `Trivy` untuk memindai celah keamanan pada Docker Image sebelum di-push ke registry.
 
 ## 🚀 Fitur Utama
 
-- **SAST (Static Application Security Testing):** Pemindaian kode otomatis menggunakan `Bandit` untuk mendeteksi celah keamanan sebelum proses build.
-- **Automated Docker Workflow:** Build image otomatis dan push ke Docker Hub dengan tagging berbasis Git Commit SHA.
-- **Multi-Environment Deployment:** Pemisahan lingkungan kerja antara **Staging** dan **Production** menggunakan Kubernetes Namespaces.
-- **GitOps-Ready:** Perubahan manifest Kubernetes (image tag, namespace, dan port) diatur secara otomatis oleh pipeline berdasarkan branch.
+- **SAST (Static Application Security Testing):**
+  - **Bandit:** Pemindaian cepat untuk mendeteksi celah keamanan spesifik Python seperti *hardcoded passwords* atau *insecure imports*.
+  - **SonarCloud:** Analisis mendalam untuk *Code Smells*, *Vulnerabilities*, dan *Bugs* dengan laporan komprehensif di dashboard cloud.
+- **SCA & Container Security:** Menggunakan `Trivy` untuk memindai *base image* dan dependensi terhadap database CVE (Common Vulnerabilities and Exposures).
+- **Automated Docker Workflow:** Build otomatis dengan tagging unik berbasis `Short SHA` untuk memastikan setiap deployment dapat dilacak dan di-*rollback*.
+- **Multi-Environment Deployment:** Otomatisasi pembaruan manifest Kubernetes (Namespace & NodePort) untuk lingkungan **Staging** dan **Production**.
 
 ## 🏗️ Arsitektur Pipeline
 
-Pipeline GitLab CI/CD terdiri dari 4 tahap utama:
+Alur kerja keamanan dirancang untuk menggagalkan pipeline jika ditemukan risiko tinggi:
 
-1.  **SAST:** Menjalankan security audit pada kode Python. Jika ditemukan celah (seperti *hardcoded bind*), pipeline akan berhenti.
-2.  **Build:** Membangun Docker image dari Dockerfile.
-3.  **Push:** Mengirim image ke Docker Hub.
-4.  **Deploy:** Memperbarui manifest Kubernetes secara otomatis menggunakan `sed` untuk menyesuaikan target environment.
+1. **Security Scan (SAST):** Menjalankan Bandit dan SonarCloud Scan secara paralel di tahap awal.
+2. **Build:** Membangun Docker image dari Dockerfile.
+3. **Security Check (Image Scan):** `Trivy` memindai image hasil build. Jika ditemukan celah dengan severity `HIGH` atau `CRITICAL`, pipeline akan berhenti otomatis.
+4. **Push:** Mengirim image yang sudah tervalidasi ke Docker Hub.
+5. **Deploy:** Injeksi konfigurasi environment ke manifest Kubernetes (Namespace & Port) menggunakan `sed`.
 
 
 
@@ -31,12 +35,16 @@ Pipeline GitLab CI/CD terdiri dari 4 tahap utama:
 | **Branch** | `staging` | `main` |
 | **Namespace K8s** | `staging` | `default` |
 | **NodePort** | `30002` | `30001` |
-| **Akses URL** | `http://minikube-ip:30002` | `http://minikube-ip:30001` |
+| **SonarCloud Project** | `kikyputraa_devops-playground` | `kikyputraa_devops-playground` |
 
-## 📖 Panduan Penggunaan
+## ⚙️ Konfigurasi Secrets
 
-### Prasyarat
-- Minikube / Cluster Kubernetes terinstal.
-- GitLab Runner terkonfigurasi.
-- Docker Hub account.
+Untuk menjalankan pipeline ini dengan sukses, pastikan variabel berikut telah diset pada **GitLab CI/CD Variables** atau **GitHub Actions Secrets**:
 
+* `SONAR_TOKEN`: Token autentikasi dari SonarCloud.
+* `SONAR_PROJECT_KEY`: Identitas unik proyek di SonarCloud.
+* `SONAR_ORG_KEY`: Nama organisasi di SonarCloud.
+* `DOCKER_USER`: Username Docker Hub.
+* `DOCKER_PASSWORD`: Password atau Personal Access Token Docker Hub.
+
+---
