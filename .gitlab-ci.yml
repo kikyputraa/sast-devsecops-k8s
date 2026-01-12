@@ -20,7 +20,7 @@ sast_bandit:
     - bandit -r app/
   allow_failure: false
 
-# 2. SonarCloud Scan
+# 2. SonarCloud Scan (Pastikan sonar-project.properties sudah ada di root)
 sonarqube_check:
   stage: sast
   image: 
@@ -64,7 +64,7 @@ trivy_scan:
   script:
     - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1
 
-# 5. Push
+# 5. Push Image
 push_job:
   stage: push
   image: docker:24.0.5
@@ -82,7 +82,7 @@ push_job:
     - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 6. Deploy (Solusi Error: Menggunakan simbol | untuk blok skrip)
+# 6. Deploy (PERBAIKAN SINTAKS SCRIPT)
 deploy_job:
   stage: deploy
   image: alpine:latest
@@ -100,6 +100,6 @@ deploy_job:
     - sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
     - sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
     - sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
-    - echo "Manifest updated for $NAMESPACE environment."
+    - echo "Successfully updated manifest for $NAMESPACE environment."
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
