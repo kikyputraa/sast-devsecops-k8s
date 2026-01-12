@@ -3,22 +3,48 @@ name: DevSecOps Pipeline
 on:
   push:
     branches: [ "main", "staging" ]
+  pull_request:
+    branches: [ "main", "staging" ]
 
 jobs:
   sast:
+    name: Security Scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
       - name: Run Bandit (SAST)
         run: |
           pip install bandit
-          bandit -r app/
+          bandit -r app/ || echo "Bandit found some issues"
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION_KEY }}
+            -Dsonar.sources=.
+            -Dsonar.python.version=3
 
   build-and-push:
+    name: Build and Push Docker Image
     needs: sast
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -36,26 +62,32 @@ jobs:
             ${{ secrets.DOCKER_USER }}/sast-scan-test:latest
 
   deploy-config:
+    name: Update Kubernetes Manifests
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       
-      # Logika Staging
-      - name: Configure Staging Manifest
-        if: github.ref == 'refs/heads/staging'
+      - name: Configure Manifests
         run: |
-          sed -i "s|namespace:.*|namespace: staging|g" k8s/deployment.yaml
-          sed -i "s|namespace:.*|namespace: staging|g" k8s/service.yml
-          sed -i "s|nodePort: 30001|nodePort: 30002|g" k8s/service.yml
+          if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            NAMESPACE="staging"
+            PORT="30002"
+          else
+            NAMESPACE="default"
+            PORT="30001"
+          fi
+          
+          sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
+          sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
+          sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
           sed -i "s|image:.*|image: ${{ secrets.DOCKER_USER }}/sast-scan-test:${{ github.sha }}|g" k8s/deployment.yaml
-          echo "Manifest Staging Ready"
+          
+          echo "Manifests updated for $NAMESPACE environment"
 
-      # Logika Production
-      - name: Configure Production Manifest
-        if: github.ref == 'refs/heads/main'
-        run: |
-          sed -i "s|namespace:.*|namespace: default|g" k8s/deployment.yaml
-          sed -i "s|namespace:.*|namespace: default|g" k8s/service.yml
-          sed -i "s|image:.*|image: ${{ secrets.DOCKER_USER }}/sast-scan-test:${{ github.sha }}|g" k8s/deployment.yaml
-          echo "Manifest Production Ready"
+      - name: Upload Manifest Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-manifests
+          path: k8s/

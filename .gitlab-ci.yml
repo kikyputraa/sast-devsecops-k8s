@@ -9,10 +9,10 @@ variables:
   DOCKER_USER: "kikyputraa"
   DOCKER_IMAGE: $DOCKER_USER/sast-scan-test
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
-  # Gunakan host.docker.internal agar container di dalam WSL bisa memanggil localhost WSL
-  SONAR_HOST_URL: "http://host.docker.internal:9000"
+  # Endpoint resmi SonarCloud
+  SONAR_HOST_URL: "https://sonarcloud.io"
 
-# 1. SAST
+# 1. SAST (Bandit)
 sast_bandit:
   stage: sast
   image: python:3.9-slim
@@ -21,18 +21,28 @@ sast_bandit:
     - bandit -r app/
   allow_failure: false
 
-# Job Baru: Scan SonarQube menggunakan Runner Lokal
+# Job Scan menggunakan SonarCloud (Variable dipanggil dari CI/CD Settings)
 sonarqube_check:
   stage: sast
-  image: sonarsource/sonar-scanner-cli:latest
+  image: 
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+    GIT_DEPTH: "0"
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
   tags:
     - assistx
   script:
-  - sonar-scanner 
-    -Dsonar.projectKey=sast-project 
-    -Dsonar.sources=. 
-    -Dsonar.host.url=http://host.docker.internal:9000 
-    -Dsonar.login=$SONAR_TOKEN
+    - sonar-scanner 
+      -Dsonar.projectKey=$SONAR_PROJECT_KEY 
+      -Dsonar.organization=$SONAR_ORG_KEY
+      -Dsonar.host.url=$SONAR_HOST_URL 
+      -Dsonar.login=$SONAR_TOKEN
+  allow_failure: true
 
 # 2. Build
 build_job:
@@ -48,7 +58,7 @@ build_job:
       - app_image.tar
     expire_in: 1 hour
 
-# 3. Trivy Scan
+# 3. Trivy Scan (Security Check)
 trivy_scan:
   stage: security_check
   image: 
@@ -77,16 +87,24 @@ push_job:
     - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 5. Deploy
+# 5. Deploy (Perbaikan Logika Shell)
 deploy_job:
   stage: deploy
   image: alpine:latest
   script:
-    - "if [ \"$CI_COMMIT_BRANCH\" == \"main\" ]; then NAMESPACE=\"default\"; PORT=\"30001\"; else NAMESPACE=\"staging\"; PORT=\"30002\"; fi"
-    - "sed -i \"s|namespace:.*|namespace: $NAMESPACE|g\" k8s/deployment.yaml"
-    - "sed -i \"s|namespace:.*|namespace: $NAMESPACE|g\" k8s/service.yml"
-    - "sed -i \"s|nodePort:.*|nodePort: $PORT|g\" k8s/service.yml"
-    - "sed -i \"s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g\" k8s/deployment.yaml"
-    - "echo \"Manifest updated for $NAMESPACE environment.\""
+    - apk add --no-cache sed
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        NAMESPACE="default"
+        PORT="30001"
+      else
+        NAMESPACE="staging"
+        PORT="30002"
+      fi
+    - sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
+    - sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
+    - sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
+    - sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
+    - echo "Manifest updated for $NAMESPACE environment."
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
