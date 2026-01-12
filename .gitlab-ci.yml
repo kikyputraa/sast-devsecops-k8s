@@ -82,7 +82,7 @@ push_job:
     - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 6. Deploy (Solusi Error Nested Array)
+# 6. Deploy (Solusi Error: Menggunakan simbol | untuk blok skrip)
 deploy_job:
   stage: deploy
   image: alpine:latest
