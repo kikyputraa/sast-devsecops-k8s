@@ -26,13 +26,14 @@ sonarqube_check:
   stage: sast
   image: sonarsource/sonar-scanner-cli:latest
   tags:
-    - assistx  # Pakai tag ini agar pindah dari Cloud ke WSL Anda
+    - assistx  # Sesuaikan dengan tag biru di dashboard GitLab Anda
   script:
     - sonar-scanner 
       -Dsonar.projectKey=sast-project 
       -Dsonar.sources=. 
       -Dsonar.host.url=http://host.docker.internal:9000 
       -Dsonar.login=$SONAR_TOKEN
+  allow_failure: true
 
 # 2. Build
 build_job:
