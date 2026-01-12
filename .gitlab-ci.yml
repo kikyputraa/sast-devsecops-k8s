@@ -66,9 +66,7 @@ deploy_job:
   stage: deploy
   image: alpine:latest
   script:
-    # Menentukan variabel berdasarkan branch
     - if [ "$CI_COMMIT_BRANCH" == "main" ]; then NAMESPACE="default"; PORT="30001"; else NAMESPACE="staging"; PORT="30002"; fi
-    # Menjalankan sed perintah demi perintah
     - sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
     - sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
     - sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
