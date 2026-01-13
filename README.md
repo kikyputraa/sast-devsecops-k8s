@@ -12,7 +12,12 @@ Untuk menjalankan proyek ini dari tahap pengembangan hingga deployment otomatis,
 * **Docker Hub:** Registry untuk menyimpan dan mendistribusikan Docker Image hasil build.
 
 ### 2. Infrastruktur & Runner
-* **Kubernetes Cluster:** Cluster aktif (Minikube, K3s, atau Managed K8s) yang memiliki namespace `default` dan `staging`.
+* **Docker Engine:**
+  - Sebagai runtime utama untuk membangun (build) image aplikasi.
+  - Sebagai driver untuk menjalankan cluster Kubernetes (Minikube/Kind).
+  - Wajib terinstal di mesin yang menjalankan Runner (GitHub/GitLab).
+* **Kubernetes Cluster (Minikube/K3s):** - Harus berjalan di atas Docker driver untuk simulasi environment.
+* **Kubectl:** - CLI untuk mengelola deployment setelah Docker image berhasil dibuat.
 * **CI/CD Runner:**
   - **GitHub Self-hosted Runner** atau **GitLab Runner** terinstal pada mesin yang memiliki akses ke cluster Kubernetes.
   - Runner harus memiliki izin untuk mengeksekusi perintah `docker` (akses ke `docker.sock`) dan `kubectl`.
