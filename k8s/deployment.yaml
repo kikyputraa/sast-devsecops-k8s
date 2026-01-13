@@ -15,9 +15,22 @@ spec:
       labels:
         app: flask-web
     spec:
+      # PERBAIKAN: Disable automounting service account token untuk Hardening
+      automountServiceAccountToken: false
       containers:
       - name: flask-app
-        image: kikyputraa/sast-scan-test:latest
+        # PERBAIKAN: Menggunakan placeholder IMAGE_TAG agar tidak hardcoded 'latest'
+        image: kikyputraa/sast-scan-test:IMAGE_TAG
         ports:
         - containerPort: 5000
         imagePullPolicy: Always
+        # PERBAIKAN: Menambahkan Resource Requests & Limits serta Storage
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+            ephemeral-storage: "100Mi"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+            ephemeral-storage: "200Mi"

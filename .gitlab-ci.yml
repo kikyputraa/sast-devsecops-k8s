@@ -9,47 +9,66 @@ variables:
   DOCKER_USER: "kikyputraa"
   DOCKER_IMAGE: $DOCKER_USER/sast-scan-test
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  # Host URL tetap di sini agar fleksibel jika pindah ke Self-Managed SonarQube
   SONAR_HOST_URL: "https://sonarcloud.io"
 
+# 1. SAST - Unit Testing & Coverage
+unit_test:
+  stage: sast
+  image: python:3.9-slim
+  script:
+    - pip install pytest pytest-cov
+    - pytest --cov=app --cov-report=xml tests/
+  artifacts:
+    paths:
+      - coverage.xml
+    expire_in: 1 hour
+
+# 2. SAST - Bandit Security Scan
 sast_bandit:
   stage: sast
   image: python:3.9-slim
   script:
-    - 'pip install bandit'
-    - 'bandit -r app/'
+    - pip install bandit
+    - bandit -r app/
   allow_failure: false
 
+# 3. SAST - SonarCloud Scan (Membaca sonar-project.properties)
 sonarqube_check:
   stage: sast
   image: 
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
+  needs:
+    - job: unit_test
+      artifacts: true
   variables:
     SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
     GIT_DEPTH: "0"
   script:
-    - |
-      sonar-scanner \
-        -Dsonar.token=$SONAR_TOKEN \
-        -Dsonar.projectKey=$SONAR_PROJECT_KEY \
-        -Dsonar.organization=$SONAR_ORG_KEY \
-        -Dsonar.sources=. \
-        -Dsonar.host.url=$SONAR_HOST_URL
+    - >
+      sonar-scanner 
+      -Dsonar.token=$SONAR_TOKEN 
+      -Dsonar.python.coverage.reportPaths=coverage.xml 
+      -Dsonar.host.url=$SONAR_HOST_URL
+      -Dsonar.qualitygate.wait=false
   allow_failure: true
 
+# 4. BUILD - Docker Image Creation
 build_job:
   stage: build
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
   script:
-    - 'docker build -t $DOCKER_IMAGE:$IMAGE_TAG .'
-    - 'docker save $DOCKER_IMAGE:$IMAGE_TAG > app_image.tar'
+    - docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
+    - docker save $DOCKER_IMAGE:$IMAGE_TAG > app_image.tar
   artifacts:
     paths:
       - app_image.tar
     expire_in: 1 hour
 
+# 5. SECURITY CHECK - Trivy Container Scan
 trivy_scan:
   stage: security_check
   image: 
@@ -58,35 +77,44 @@ trivy_scan:
   dependencies:
     - build_job
   script:
-    - 'trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1'
+    - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1
 
+# 6. PUSH - Upload to Docker Hub
 push_job:
   stage: push
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
-  needs:
+  needs: 
     - job: build_job
       artifacts: true
     - job: trivy_scan
   before_script:
-    - 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin'
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
   script:
-    - 'docker load < app_image.tar'
-    - 'docker push $DOCKER_IMAGE:$IMAGE_TAG'
-    - 'docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest'
-    - 'docker push $DOCKER_IMAGE:latest'
+    - docker load < app_image.tar
+    - docker push $DOCKER_IMAGE:$IMAGE_TAG
+    - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
+    - docker push $DOCKER_IMAGE:latest
 
+# 7. DEPLOY - K8s Manifest Update
 deploy_job:
   stage: deploy
   image: alpine:latest
   script:
-    - 'apk add --no-cache sed'
-    - 'if [ "$CI_COMMIT_BRANCH" == "main" ]; then NAMESPACE="default"; PORT="30001"; else NAMESPACE="staging"; PORT="30002"; fi'
-    - 'sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml'
-    - 'sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml'
-    - 'sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml'
-    - 'sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml'
-    - 'echo "Deployment updated for $NAMESPACE"'
+    - apk add --no-cache sed
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        NAMESPACE="default"
+        PORT="30001"
+      else
+        NAMESPACE="staging"
+        PORT="30002"
+      fi
+      sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
+      sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
+      sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
+      sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
+      echo "Deployment updated for $NAMESPACE on port $PORT"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
