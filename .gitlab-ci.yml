@@ -11,6 +11,19 @@ variables:
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
   SONAR_HOST_URL: "https://sonarcloud.io"
 
+# 1. SAST - Unit Testing (Untuk menaikkan Coverage agar Quality Gate Hijau)
+unit_test:
+  stage: sast
+  image: python:3.9-slim
+  script:
+    - pip install pytest pytest-cov
+    - pytest --cov=app --cov-report=xml tests/
+  artifacts:
+    paths:
+      - coverage.xml
+    expire_in: 1 hour
+
+# 2. SAST - Bandit (Scan keamanan kode Python)
 sast_bandit:
   stage: sast
   image: python:3.9-slim
@@ -19,24 +32,19 @@ sast_bandit:
     - 'bandit -r app/'
   allow_failure: false
 
+# 3. SAST - SonarCloud (Analisis Kualitas Kode)
 sonarqube_check:
   stage: sast
   image: 
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
-  # SOLUSI: Jalankan sebagai root agar bisa dnf install
-  user: root
+  needs:
+    - job: unit_test
+      artifacts: true
   variables:
     SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
     GIT_DEPTH: "0"
-  before_script:
-    # dnf sekarang akan berhasil karena user adalah root
-    - dnf install -y python3 python3-pip
-    - pip3 install pytest pytest-cov
   script:
-    # 1. Jalankan test (ini akan menghasilkan coverage.xml)
-    - pytest --cov=app --cov-report=xml tests/
-    # 2. Jalankan scanner
     - |
       sonar-scanner \
         -Dsonar.token=$SONAR_TOKEN \
@@ -47,6 +55,7 @@ sonarqube_check:
         -Dsonar.host.url=$SONAR_HOST_URL
   allow_failure: true
 
+# 4. BUILD - Membuat Image Docker
 build_job:
   stage: build
   image: docker:24.0.5
@@ -60,6 +69,7 @@ build_job:
       - app_image.tar
     expire_in: 1 hour
 
+# 5. SECURITY CHECK - Scan Image menggunakan Trivy
 trivy_scan:
   stage: security_check
   image: 
@@ -70,6 +80,7 @@ trivy_scan:
   script:
     - 'trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1'
 
+# 6. PUSH - Mengirim Image ke Docker Hub
 push_job:
   stage: push
   image: docker:24.0.5
@@ -87,6 +98,7 @@ push_job:
     - 'docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest'
     - 'docker push $DOCKER_IMAGE:latest'
 
+# 7. DEPLOY - Update Manifest Kubernetes (Dummy/Sed)
 deploy_job:
   stage: deploy
   image: alpine:latest
@@ -97,6 +109,6 @@ deploy_job:
     - 'sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml'
     - 'sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml'
     - 'sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml'
-    - 'echo "Deployment updated for $NAMESPACE"'
+    - 'echo "Deployment manifest updated for $NAMESPACE on port $PORT"'
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
