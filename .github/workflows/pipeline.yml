@@ -7,12 +7,8 @@ on:
 env:
   DOCKER_USER: "kikyputraa"
   DOCKER_IMAGE: "kikyputraa/sast-scan-test"
-  # Ganti nilai di bawah ini dengan Key asli dari SonarCloud Information
-  SONAR_PROJECT_KEY: "PROJECT_KEY_ANDA"
-  SONAR_ORG_KEY: "ORG_KEY_ANDA"
 
 jobs:
-  # 1. UNIT TEST
   unit_test:
     runs-on: ubuntu-latest
     steps:
@@ -31,21 +27,15 @@ jobs:
           name: coverage-report
           path: coverage.xml
 
-  # 2. SAST BANDIT
   sast_bandit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
       - name: Run Bandit
         run: |
           pip install bandit
           bandit -r app/
 
-  # 3. SONARQUBE CHECK
   sonarqube_check:
     needs: unit_test
     runs-on: ubuntu-latest
@@ -63,14 +53,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
+          # Scanner otomatis membaca sonar-project.properties
           args: >
-            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
-            -Dsonar.organization=${{ env.SONAR_ORG_KEY }}
-            -Dsonar.sources=.
             -Dsonar.python.coverage.reportPaths=coverage.xml
             -Dsonar.qualitygate.wait=false
 
-  # 4. BUILD
   build_job:
     needs: [sast_bandit, sonarqube_check]
     runs-on: ubuntu-latest
@@ -86,7 +73,6 @@ jobs:
           name: docker-image
           path: app_image.tar
 
-  # 5. SECURITY CHECK (Trivy)
   security_check:
     needs: build_job
     runs-on: ubuntu-latest
@@ -101,10 +87,8 @@ jobs:
           image-ref: '${{ env.DOCKER_IMAGE }}:${{ github.sha }}'
           format: 'table'
           exit-code: '1'
-          ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
 
-  # 6. PUSH
   push_job:
     needs: security_check
     runs-on: ubuntu-latest
@@ -125,7 +109,6 @@ jobs:
           docker tag ${{ env.DOCKER_IMAGE }}:${{ github.sha }} ${{ env.DOCKER_IMAGE }}:latest
           docker push ${{ env.DOCKER_IMAGE }}:latest
 
-  # 7. DEPLOY
   deploy_job:
     needs: push_job
     runs-on: ubuntu-latest
@@ -144,4 +127,3 @@ jobs:
           sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
           sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
           sed -i "s|image:.*|image: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}|g" k8s/deployment.yaml
-          echo "Deployment updated for $NAMESPACE"
