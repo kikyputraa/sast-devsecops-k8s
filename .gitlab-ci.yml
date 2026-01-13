@@ -24,15 +24,17 @@ sonarqube_check:
   image: 
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
+  # SOLUSI: Jalankan sebagai root agar bisa dnf install
+  user: root
   variables:
     SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
     GIT_DEPTH: "0"
   before_script:
-    # Gunakan dnf karena image terbaru berbasis Amazon Linux
+    # dnf sekarang akan berhasil karena user adalah root
     - dnf install -y python3 python3-pip
     - pip3 install pytest pytest-cov
   script:
-    # 1. Jalankan test
+    # 1. Jalankan test (ini akan menghasilkan coverage.xml)
     - pytest --cov=app --cov-report=xml tests/
     # 2. Jalankan scanner
     - |
