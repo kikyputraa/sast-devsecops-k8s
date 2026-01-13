@@ -7,82 +7,85 @@ on:
     branches: [ "main", "staging" ]
 
 jobs:
-  # 1. SAST & SonarCloud Scan
-  security_scan:
-    name: SAST & SonarCloud
+  sast:
+    name: Security Scan (SAST)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0  # Penting untuk SonarCloud agar bisa melihat history git
 
-      - name: Run Bandit (Python SAST)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Run Bandit (Security Audit)
         run: |
           pip install bandit
-          bandit -r app/ || echo "Issues found"
-
+          # Flag -r: recursive, -ll: level LOW atau lebih tinggi
+          # Flag -x: abaikan folder test jika ada
+          bandit -r app/ -ll -v
+          
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v3
+        uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION_KEY }}
+            -Dsonar.organization=${{ secrets.SONAR_ORG_KEY }}
+            -Dsonar.qualitygate.wait=true
 
-  # 2. Build & Push to Docker Hub
-  build-and-push:
-    name: Build and Push
-    needs: security_scan
+  build-and-scan:
+    name: Build and Image Scan
+    needs: sast
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKER_USER }}/flask-app:${{ github.sha }} .
+
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKER_USER }}/flask-app:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1' # MEMBUAT PIPELINE GAGAL jika ditemukan celah
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USER }}/sast-scan-test:${{ github.sha }}
-            ${{ secrets.DOCKER_USER }}/sast-scan-test:latest
+      - name: Push Image to Docker Hub
+        run: docker push ${{ secrets.DOCKER_USER }}/flask-app:${{ github.sha }}
 
-  # 3. Deploy Configuration (Update Manifests)
-  deploy-update:
-    name: Update K8s Manifests
-    needs: build-and-push
-    runs-on: ubuntu-latest
+  deploy:
+    name: Deploy to Kubernetes
+    needs: build-and-scan
+    runs-on: self-hosted # Menggunakan runner lokal Anda (WSL2)
     steps:
       - uses: actions/checkout@v4
 
-      - name: Update Deployment & Service
+      - name: Set Environment Context
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            NAMESPACE="default"
-            PORT="30001"
+            echo "NAMESPACE=default" >> $GITHUB_ENV
+            echo "NODE_PORT=30001" >> $GITHUB_ENV
           else
-            NAMESPACE="staging"
-            PORT="30002"
+            echo "NAMESPACE=staging" >> $GITHUB_ENV
+            echo "NODE_PORT=30002" >> $GITHUB_ENV
           fi
-          
-          # Update Namespace & Image
-          sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
-          sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
-          sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
-          sed -i "s|image:.*|image: ${{ secrets.DOCKER_USER }}/sast-scan-test:${{ github.sha }}|g" k8s/deployment.yaml
-          
-          echo "Manifests updated for $NAMESPACE environment."
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: updated-k8s-manifests
-          path: k8s/
+      - name: Deploy to Minikube
+        run: |
+          sed -i "s|{{IMAGE_TAG}}|${{ github.sha }}|g" k8s/deployment.yaml
+          sed -i "s|{{NAMESPACE}}|${{ env.NAMESPACE }}|g" k8s/deployment.yaml
+          kubectl apply -f k8s/deployment.yaml -n ${{ env.NAMESPACE }}
