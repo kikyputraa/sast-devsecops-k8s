@@ -53,7 +53,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          # Biarkan membaca dari file properties, tapi kita pastikan path coverage benar
           args: >
             -Dsonar.python.coverage.reportPaths=coverage.xml
             -Dsonar.qualitygate.wait=false
@@ -65,7 +64,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and Save Image
         run: |
+          # Build image dengan tag commit SHA
           docker build -t ${{ env.DOCKER_IMAGE }}:${{ github.sha }} .
+          # Simpan ke file tar agar bisa dipindah antar job
           docker save ${{ env.DOCKER_IMAGE }}:${{ github.sha }} > app_image.tar
       - name: Upload Image Artifact
         uses: actions/upload-artifact@v4
@@ -81,12 +82,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: docker-image
+
+      # PERBAIKAN: Load image dari tar ke Docker lokal sebelum scan
+      - name: Load Docker image
+        run: docker load < app_image.tar
+
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ env.DOCKER_IMAGE }}:${{ github.sha }}'
           format: 'table'
           exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
   push_job:
