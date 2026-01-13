@@ -2,10 +2,6 @@
 
 Proyek ini mendemonstrasikan implementasi alur kerja **DevSecOps** modern untuk aplikasi berbasis Python Flask. Sistem ini mengintegrasikan pemindaian keamanan otomatis tingkat lanjut, containerization, dan manajemen multi-environment menggunakan dual-platform CI/CD (GitLab & GitHub Actions).
 
-## 🆕 Update Terbaru
-- **Migrasi SonarCloud:** Integrasi pemindaian kualitas kode dan keamanan menggunakan SonarCloud dengan sistem *Secret Token*.
-- **Dual-CI/CD Workflow:** Mendukung GitHub Actions dan GitLab CI/CD secara bersamaan untuk fleksibilitas platform.
-- **Vulnerability Scanning:** Penambahan `Trivy` untuk memindai celah keamanan pada Docker Image sebelum di-push ke registry.
 
 ## 🚀 Fitur Utama
 
