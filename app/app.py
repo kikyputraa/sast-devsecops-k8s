@@ -1,5 +1,9 @@
 from flask import Flask
 
+# Celah keamanan: Hardcoded Password & Bind to all interfaces
+DEBUG_MODE = True
+ADMIN_SECRET = "super_secret_password_123" # Ini akan memicu Bandit/Sonar
+
 app = Flask(__name__)
 
 @app.route("/")  # Pastikan menggunakan .route BUKAN .main
