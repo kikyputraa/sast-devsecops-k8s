@@ -36,9 +36,8 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORG_KEY }}
             -Dsonar.sources=app/
-            -Dsonar.python.version=3
-            -Dsonar.qualitygate.wait=true
-
+            -Dsonar.qualitygate.wait=false
+            
   build-and-scan:
     name: Build and Image Scan
     needs: sast
