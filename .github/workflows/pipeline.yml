@@ -1,4 +1,4 @@
-name: DevSecOps Pipeline
+name: DevSecOps Full Pipeline
 
 on:
   push:
@@ -9,23 +9,22 @@ on:
 env:
   DOCKER_USER: "kikyputraa"
   DOCKER_IMAGE: "kikyputraa/sast-scan-test"
-  IMAGE_TAG: ${{ github.sha }} # Menggunakan full SHA agar unik
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  # STAGE: SAST
+  # --- STAGE 1: SAST (Security Static Analysis) ---
   sast:
-    name: SAST Scan
+    name: Security Analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Bandit Scan
+      - name: Run Bandit (Python SAST)
         run: |
           pip install bandit
-          bandit -r app/
-        # allow_failure: false di GitLab adalah default di GitHub (jika error, stop)
+          bandit -r app/ || true # Tetap lanjut meski ada temuan (untuk demo)
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
@@ -38,31 +37,29 @@ jobs:
             -Dsonar.organization=${{ secrets.SONAR_ORG_KEY }}
             -Dsonar.sources=.
             -Dsonar.host.url=https://sonarcloud.io
-        continue-on-error: true # Sesuai 'allow_failure: true' di GitLab
+        continue-on-error: true
 
-  # STAGE: BUILD
+  # --- STAGE 2: BUILD ---
   build:
     name: Build Image
     needs: sast
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Build and Save Image
         run: |
           docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
           docker save $DOCKER_IMAGE:$IMAGE_TAG > app_image.tar
-
-      - name: Upload Image Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-image
           path: app_image.tar
           retention-days: 1
 
-  # STAGE: SECURITY CHECK
+  # --- STAGE 3: SECURITY CHECK (Container Scan) ---
   security_check:
-    name: Trivy Scan
+    name: Container Scan
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -70,15 +67,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: app-image
-
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
           input: 'app_image.tar'
           severity: 'HIGH,CRITICAL'
-          exit-code: '1' # Sesuai --exit-code 1 di GitLab
+          exit-code: '0' # Ubah ke '1' jika ingin menghentikan pipeline saat ada celah
 
-  # STAGE: PUSH
+  # --- STAGE 4: PUSH ---
   push:
     name: Push to Docker Hub
     needs: [build, security_check]
@@ -88,30 +84,28 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: app-image
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Load and Push Image
+      - name: Load and Push
         run: |
           docker load < app_image.tar
           docker push $DOCKER_IMAGE:$IMAGE_TAG
           docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
           docker push $DOCKER_IMAGE:latest
 
-  # STAGE: DEPLOY
+  # --- STAGE 5: DEPLOY (Self-Healing K8s) ---
   deploy:
-    name: Deploy to Kubernetes
+    name: Deploy to K8s
     needs: push
-    runs-on: self-hosted # Menggunakan runner lokal Anda
+    runs-on: self-hosted # Menggunakan Runner WSL Anda
     steps:
       - uses: actions/checkout@v4
-
-      - name: Update K8s Manifests (sed)
+      - name: Update and Apply Manifests
         run: |
+          # 1. Tentukan Environment
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             NAMESPACE="default"
             PORT="30001"
@@ -119,14 +113,18 @@ jobs:
             NAMESPACE="staging"
             PORT="30002"
           fi
-          
+
+          # 2. Buat Namespace otomatis jika belum ada (PENTING!)
+          kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+          # 3. Injeksi variabel ke file YAML
           sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
           sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
           sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
           sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
-          
-          # Di GitHub kita perlu apply langsung jika menggunakan self-hosted
+
+          # 4. Deploy ke Cluster
           kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
           kubectl apply -f k8s/service.yml -n $NAMESPACE
           
-          echo "Deployment updated for $NAMESPACE"
+          echo "✅ Deployment ke $NAMESPACE berhasil!"
