@@ -53,7 +53,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          # Argumen kosong atau minimal, biarkan scanner membaca sonar-project.properties
+          # Biarkan membaca dari file properties, tapi kita pastikan path coverage benar
           args: >
             -Dsonar.python.coverage.reportPaths=coverage.xml
             -Dsonar.qualitygate.wait=false
