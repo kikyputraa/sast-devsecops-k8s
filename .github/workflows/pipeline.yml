@@ -127,4 +127,4 @@ jobs:
           kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
           kubectl apply -f k8s/service.yml -n $NAMESPACE
           
-          echo "✅ Deployment ke $NAMESPACE berhasil!"
+          echo "✅ Deployment ke $NAMESPACE berhasil!"# Manual Trigger
