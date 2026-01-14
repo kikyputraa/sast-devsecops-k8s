@@ -9,10 +9,8 @@ variables:
   DOCKER_USER: "kikyputraa"
   DOCKER_IMAGE: $DOCKER_USER/devops-playground
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
-  # Host URL tetap di sini agar fleksibel jika pindah ke Self-Managed SonarQube
   SONAR_HOST_URL: "https://sonarcloud.io"
 
-# 1. SAST - Unit Testing & Coverage
 unit_test:
   stage: sast
   image: python:3.9-slim
@@ -24,7 +22,6 @@ unit_test:
       - coverage.xml
     expire_in: 1 hour
 
-# 2. SAST - Bandit Security Scan
 sast_bandit:
   stage: sast
   image: python:3.9-slim
@@ -33,7 +30,6 @@ sast_bandit:
     - bandit -r app/
   allow_failure: false
 
-# 3. SAST - SonarCloud Scan (Membaca sonar-project.properties)
 sonarqube_check:
   stage: sast
   image: 
@@ -51,10 +47,10 @@ sonarqube_check:
       -Dsonar.token=$SONAR_TOKEN 
       -Dsonar.python.coverage.reportPaths=coverage.xml 
       -Dsonar.host.url=$SONAR_HOST_URL
+      -Dsonar.branch.name=staging
       -Dsonar.qualitygate.wait=false
   allow_failure: true
 
-# 4. BUILD - Docker Image Creation
 build_job:
   stage: build
   image: docker:24.0.5
@@ -68,7 +64,6 @@ build_job:
       - app_image.tar
     expire_in: 1 hour
 
-# 5. SECURITY CHECK - Trivy Container Scan
 trivy_scan:
   stage: security_check
   image: 
@@ -79,7 +74,6 @@ trivy_scan:
   script:
     - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1
 
-# 6. PUSH - Upload to Docker Hub
 push_job:
   stage: push
   image: docker:24.0.5
@@ -97,7 +91,6 @@ push_job:
     - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 7. DEPLOY - K8s Manifest Update
 deploy_job:
   stage: deploy
   image: alpine:latest
@@ -115,6 +108,5 @@ deploy_job:
       sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
       sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
       sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
-      echo "Deployment updated for $NAMESPACE on port $PORT"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
