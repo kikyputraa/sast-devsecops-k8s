@@ -1,10 +1,18 @@
 FROM python:3.9-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Perhatikan jalur 'app/' dibawah ini
-COPY app/requirements.txt .
-RUN pip install --upgrade pip setuptools && pip install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools \
+    && pip install --no-cache-dir "jaraco.context>=6.1.0"
 
-COPY app/ .
+COPY requirements.txt .
 
-CMD ["python", "app.py"] 
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 5000
+CMD ["python", "app.py"]
