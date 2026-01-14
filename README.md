@@ -1,6 +1,6 @@
 # Flask DevSecOps Pipeline with Kubernetes
 
-Proyek ini mendemonstrasikan implementasi alur kerja **DevSecOps** modern untuk aplikasi sederhana berbasis Python Flask. Sistem ini mengintegrasikan pemindaian keamanan otomatis tingkat lanjut, containerization, dan manajemen multi-environment menggunakan dual-platform CI/CD (GitLab & GitHub Actions).
+This project demonstrates the implementation of a modern **DevSecOps** workflow for a Python Flask application. The system integrates advanced automated security scanning, containerization, and multi-environment management using a dual-platform CI/CD approach (GitLab & GitHub Actions).
 
 ---
 
@@ -25,80 +25,77 @@ Proyek ini mendemonstrasikan implementasi alur kerja **DevSecOps** modern untuk 
 
 ---
 
-## 🛠️ Prasyarat (Requirements)
+## 📋 Prerequisites
 
-Untuk menjalankan proyek ini dari tahap pengembangan hingga deployment otomatis, Anda memerlukan beberapa komponen berikut:
+To run this project from development to automated deployment, you will need the following components:
 
-### 1. Akun & Akses Layanan (Cloud SaaS)
-* **GitHub & GitLab:** Repositori untuk menyimpan kode dan menjalankan engine CI/CD.
-* **SonarCloud:** Akun yang terhubung ke repositori untuk analisis keamanan kode (SAST).
-* **Docker Hub:** Registry untuk menyimpan dan mendistribusikan Docker Image hasil build.
+### 1. Accounts & Cloud SaaS Access
+* **GitHub & GitLab:** Repositories for source code management and CI/CD engine execution.
+* **SonarCloud:** Account connected to the repository for Static Application Security Testing (SAST).
+* **Docker Hub:** Registry for storing and distributing built Docker images.
 
-### 2. Infrastruktur & Runner
+### 2. Infrastructure & Runners
 * **Docker Engine:**
-  - Sebagai runtime utama untuk membangun (build) image aplikasi.
-  - Sebagai driver untuk menjalankan cluster Kubernetes (Minikube/Kind).
-  - Wajib terinstal di mesin yang menjalankan Runner (GitHub/GitLab).
-* **Kubernetes Cluster (Minikube/K3s):** - Harus berjalan di atas Docker driver untuk simulasi environment.
-* **Kubectl:** - CLI untuk mengelola deployment setelah Docker image berhasil dibuat.
-* **CI/CD Runner:**
-  - **GitHub Self-hosted Runner** atau **GitLab Runner** terinstal pada mesin yang memiliki akses ke cluster Kubernetes.
-  - Runner harus memiliki izin untuk mengeksekusi perintah `docker` (akses ke `docker.sock`) dan `kubectl`.
+  - Primary runtime for building application images.
+  - Driver for running Kubernetes clusters (Minikube/Kind).
+  - Must be installed on the machine running the CI/CD Runners.
+* **Kubernetes Cluster (Minikube/K3s):** Must run on the Docker driver for environment simulation.
+* **Kubectl:** CLI tool to manage deployments after the Docker image is successfully built.
+* **CI/CD Runners:**
+  - **GitHub Self-hosted Runner** or **GitLab Runner** installed on a machine with access to the Kubernetes cluster.
+  - Runners must have permissions to execute `docker` commands (access to `docker.sock`) and `kubectl`.
 
-### 3. Software di Mesin Lokal (Opsional untuk Testing)
-Jika ingin melakukan pengujian sebelum melakukan push ke repositori:
-* **Python 3.9+** & **Pip** (untuk menjalankan Flask & Pytest).
-* **Docker Engine** (untuk build image lokal).
-* **Kubectl CLI** (untuk manajemen cluster).
-* **Trivy CLI** & **Bandit** (untuk pemindaian keamanan lokal).
+### 3. Local Machine Software (Optional for Testing)
+For local testing before pushing to the repository:
+* **Python 3.9+** & **Pip** (to run Flask & Pytest).
+* **Docker Engine** (for local image builds).
+* **Kubectl CLI** (for cluster management).
+* **Trivy CLI** & **Bandit** (for local security scanning).
 
-### 4. Konfigurasi File Esensial
-Pastikan file-file berikut berada di root direktori proyek:
-* `sonar-project.properties`: Berisi identitas proyek SonarCloud.
-* `Dockerfile`: Konfigurasi container aplikasi.
-* `k8s/`: Folder berisi manifest `deployment.yaml` dan `service.yml`.
-* `requirements.txt`: Daftar dependensi Python (Flask, Pytest-cov, dll).
+### 4. Essential Configuration Files
+Ensure the following files are in the project root directory:
+* `sonar-project.properties`: SonarCloud project identification.
+* `Dockerfile`: Application container configuration.
+* `k8s/`: Folder containing `deployment.yaml` and `service.yml` manifests.
+* `requirements.txt`: List of Python dependencies (Flask, Pytest-cov, etc.).
 
-
-## 🚀 Fitur Utama
+## 🚀 Key Features
 
 - **SAST (Static Application Security Testing):**
-  - **Bandit:** Pemindaian cepat untuk mendeteksi celah keamanan spesifik Python seperti *hardcoded passwords* atau *insecure imports*.
-  - **SonarCloud:** Analisis mendalam untuk *Code Smells*, *Vulnerabilities*, dan *Bugs* dengan laporan komprehensif di dashboard cloud.
-- **SCA & Container Security:** Menggunakan `Trivy` untuk memindai *base image* dan dependensi terhadap database CVE (Common Vulnerabilities and Exposures).
-- **Automated Docker Workflow:** Build otomatis dengan tagging unik berbasis `Short SHA` untuk memastikan setiap deployment dapat dilacak dan di-*rollback*.
-- **Multi-Environment Deployment:** Otomatisasi pembaruan manifest Kubernetes (Namespace & NodePort) untuk lingkungan **Staging** dan **Production**.
+  - **Bandit:** Fast scanning to detect Python-specific security flaws like hardcoded passwords or insecure imports.
+  - **SonarCloud:** Deep analysis for Code Smells, Vulnerabilities, and Bugs with comprehensive dashboard reports.
+- **SCA & Container Security:** Utilizes `Trivy` to scan base images and dependencies against the CVE (Common Vulnerabilities and Exposures) database.
+- **Automated Docker Workflow:** Automatic builds with unique tagging based on `Short SHA` to ensure every deployment is traceable and rollback-ready.
+- **Multi-Environment Deployment:** Automated updates of Kubernetes manifests (Namespace & NodePort) for **Staging** and **Production** environments.
 
-## 🏗️ Arsitektur Pipeline
+## 🏗️ Pipeline Architecture
 
-Alur kerja keamanan dirancang untuk menggagalkan pipeline jika ditemukan risiko tinggi:
+The security workflow is designed to fail the pipeline if high-risk issues are detected:
 
-1. **Security Scan (SAST):** Menjalankan Bandit dan SonarCloud Scan secara paralel di tahap awal.
-2. **Build:** Membangun Docker image dari Dockerfile.
-3. **Security Check (Image Scan):** `Trivy` memindai image hasil build. Jika ditemukan celah dengan severity `HIGH` atau `CRITICAL`, pipeline akan berhenti otomatis.
-4. **Push:** Mengirim image yang sudah tervalidasi ke Docker Hub.
-5. **Deploy:** Injeksi konfigurasi environment ke manifest Kubernetes (Namespace & Port) menggunakan `sed`.
+1. **Security Scan (SAST):** Runs Bandit and SonarCloud Scan in parallel at the initial stage.
+2. **Build:** Builds the Docker image from the Dockerfile.
+3. **Security Check (Image Scan):** `Trivy` scans the built image. If `HIGH` or `CRITICAL` severity vulnerabilities are found, the pipeline stops automatically.
+4. **Push:** Sends validated images to Docker Hub.
+5. **Deploy:** Injects environment configurations into Kubernetes manifests (Namespace & Port) using `sed`.
 
+## 🛠️ Environment Details
 
-
-## 🛠️ Detail Environment
-
-| Fitur | Staging Environment | Production Environment |
+| Feature | Staging Environment | Production Environment |
 | :--- | :--- | :--- |
 | **Branch** | `staging` | `main` |
-| **Namespace K8s** | `staging` | `default` |
+| **K8s Namespace** | `staging` | `default` |
 | **NodePort** | `30002` | `30001` |
 | **SonarCloud Project** | `kikyputraa_devops-playground` | `kikyputraa_devops-playground` |
 
-## ⚙️ Konfigurasi Secrets
+## ⚙️ Secrets Configuration
 
-Untuk menjalankan pipeline ini dengan sukses, pastikan variabel berikut telah diset pada **GitLab CI/CD Variables** atau **GitHub Actions Secrets**:
+To run this pipeline successfully, ensure the following variables are set in **GitLab CI/CD Variables** or **GitHub Actions Secrets**:
 
-* `SONAR_TOKEN`: Token autentikasi dari SonarCloud.
-* `SONAR_PROJECT_KEY`: Identitas unik proyek di SonarCloud.
-* `SONAR_ORG_KEY`: Nama organisasi di SonarCloud.
-* `DOCKER_USER`: Username Docker Hub.
-* `DOCKER_PASSWORD`: Password atau Personal Access Token Docker Hub.
-
+* `SONAR_TOKEN`: Authentication token from SonarCloud.
+* `SONAR_PROJECT_KEY`: Unique project identifier in SonarCloud.
+* `SONAR_ORG_KEY`: Organization name in SonarCloud.
+* `DOCKER_USER`: Docker Hub username.
+* `DOCKER_PASSWORD`: Docker Hub password or Personal Access Token.
 
 ---
+**Maintained by [kikyputraa](https://github.com/kikyputraa)**
