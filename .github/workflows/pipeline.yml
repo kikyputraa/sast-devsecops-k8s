@@ -90,7 +90,6 @@ jobs:
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
-          vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
   push_job:
@@ -127,7 +126,13 @@ jobs:
             NAMESPACE="staging"
             PORT="30002"
           fi
+          # Update Namespace, NodePort, and Image Tag
           sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
           sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
           sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
           sed -i "s|image:.*|image: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}|g" k8s/deployment.yaml
+      - name: Archive K8s Manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-manifests
+          path: k8s/

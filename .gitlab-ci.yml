@@ -48,7 +48,6 @@ sonarqube_check:
       -Dsonar.python.coverage.reportPaths=coverage.xml 
       -Dsonar.host.url=$SONAR_HOST_URL
       -Dsonar.branch.name=staging
-      -Dsonar.qualitygate.wait=false
   allow_failure: true
 
 build_job:
@@ -108,5 +107,8 @@ deploy_job:
       sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/service.yml
       sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yml
       sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
+  artifacts:
+    paths:
+      - k8s/
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
