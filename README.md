@@ -8,20 +8,26 @@ This project demonstrates the implementation of a modern **DevSecOps** workflow 
 [![GitHub Pipeline](https://github.com/kikyputraa/devops-playground/actions/workflows/pipeline.yml/badge.svg?branch=staging)](https://github.com/kikyputraa/devops-playground/actions)
 [![GitLab Pipeline](https://gitlab.com/kikyputraa/sast-test/badges/staging/pipeline.svg)](https://gitlab.com/kikyputraa/sast-test/-/commits/staging)
 [![Docker Pulls](https://img.shields.io/docker/pulls/kikyputraa/devops-playground?style=flat&logo=docker&color=2496ed)](https://hub.docker.com/r/kikyputraa/devops-playground)
-[![Last Commit](https://img.shields.io/github/last-commit/kikyputraa/devops-playground/staging?logo=git)](https://github.com/kikyputraa/devops-playground/commits/staging)
+[![Last Commit](https://img.shields.io/github/last-commit/kikyputraa/devops-playground/staging?style=flat&logo=git)](https://github.com/kikyputraa/devops-playground/commits/staging)
 
 ### 🛡️ Security & Quality Gate
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kikyputraa_devops-playground&metric=alert_status)](https://sonarcloud.io/dashboard?id=kikyputraa_devops-playground)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=kikyputraa_devops-playground&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=kikyputraa_devops-playground)
-![DevSecOps](https://img.shields.io/badge/DevSecOps-Automated-green?logo=shield)
-![SAST](https://img.shields.io/badge/SAST-Bandit-blue)
-![Container Scan](https://img.shields.io/badge/SCA-Trivy-blue)
+![DevSecOps](https://img.shields.io/badge/DevSecOps-Automated-44cc11?style=flat&logo=shield)
+![SAST](https://img.shields.io/badge/SAST-Bandit-00599c?style=flat&logo=python&logoColor=white)
+![Container Scan](https://img.shields.io/badge/SCA-Trivy-red?style=flat&logo=trivy&logoColor=white)
 
 ### 🛠️ Infrastructure & Tech Stack
-![Python](https://img.shields.io/badge/Python-3.9--slim-blue?logo=python)
-![Docker](https://img.shields.io/badge/Docker-Containerized-blue?logo=docker)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s/Minikube-blue?logo=kubernetes)
-![Flask](https://img.shields.io/badge/Framework-Flask-lightgrey?logo=flask)
+![Python](https://img.shields.io/badge/Python-3.9--slim-3776AB?style=flat&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Framework-Flask-000000?style=flat&logo=flask&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s/Minikube-326CE5?style=flat&logo=kubernetes&logoColor=white)
+
+### ⚙️ Infrastructure Resilience (Kubernetes)
+![HPA](https://img.shields.io/badge/Autoscaling-HPA_Enabled-orange?style=flat&logo=kubernetes&logoColor=white)
+![Self-Healing](https://img.shields.io/badge/Infrastructure-Self--Healing-blueviolet?style=flat&logo=kubernetes&logoColor=white)
+![Zero-Downtime](https://img.shields.io/badge/Deployment-Zero--Downtime-brightgreen?style=flat&logo=target&logoColor=white)
+![Metrics-Server](https://img.shields.io/badge/Monitoring-Metrics--Server-9431d4?style=flat&logo=kubernetes&logoColor=white)
 
 ## 📋 Prerequisites
 
@@ -58,12 +64,13 @@ Ensure the following files are in the project root directory:
 * `requirements.txt`: List of Python dependencies (Flask, Pytest-cov, etc.).
 
 ## 🚀 Key Features
-- **SAST (Static Application Security Testing):**
-  - **Bandit:** Fast scanning to detect Python-specific security flaws like hardcoded passwords or insecure imports.
-  - **SonarCloud:** Deep analysis for Code Smells, Vulnerabilities, and Bugs with comprehensive dashboard reports.
-- **SCA & Container Security:** Utilizes `Trivy` to scan base images and dependencies against the CVE (Common Vulnerabilities and Exposures) database.
-- **Automated Docker Workflow:** Automatic builds with unique tagging based on `Short SHA` to ensure every deployment is traceable and rollback-ready.
-- **Multi-Environment Deployment:** Automated updates of Kubernetes manifests (Namespace & NodePort) for **Staging** and **Production** environments.
+- **Elasticity & Auto-scaling:** Dynamic pod scaling based on real-time resource utilization (CPU Metrics).
+- **Self-Healing Infrastructure:** Automated detection and recovery of unhealthy pods via Liveness and Readiness probes.
+- **Zero Downtime Deployment:** Seamless application updates using the `RollingUpdate` strategy to eliminate service interruption.
+- **SAST (Static Application Security Testing):** Deep analysis for Code Smells, Vulnerabilities, and Bugs via Bandit and SonarCloud.
+- **SCA & Container Security:** Utilizes `Trivy` to scan base images and dependencies against the CVE database.
+
+
 
 ## 🏗️ Pipeline Architecture
 
@@ -97,4 +104,3 @@ To run this pipeline successfully, ensure the following variables are set in **G
 
 ---
 **Maintained by [kikyputraa](https://github.com/kikyputraa)**
-
