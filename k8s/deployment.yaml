@@ -7,6 +7,11 @@ metadata:
     app: flask-web
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        
+      maxUnavailable: 0 
   selector:
     matchLabels:
       app: flask-web
@@ -18,10 +23,24 @@ spec:
       automountServiceAccountToken: false
       containers:
       - name: flask-app
-        image: kikyputraa/devops-playground:IMAGE_TAG
+        image: kikyputraa/devops-playground:latest
         ports:
         - containerPort: 5000
         imagePullPolicy: Always
+        
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+
         resources:
           requests:
             memory: "64Mi"
