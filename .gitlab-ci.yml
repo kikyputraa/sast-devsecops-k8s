@@ -11,39 +11,35 @@ variables:
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
   SONAR_HOST_URL: "https://sonarcloud.io"
 
-# 1. UNIT TEST & COVERAGE
 unit_test:
   stage: sast
   image: python:3.9-slim
+  tags:
+    - wsl-local
   script:
     - pip install pytest pytest-cov
     - pytest --cov=app --cov-report=xml tests/
   artifacts:
     paths:
       - coverage.xml
-    expire_in: 1 hour
 
-# 2. BANDIT SECURITY SCAN
 sast_bandit:
   stage: sast
   image: python:3.9-slim
+  tags:
+    - wsl-local
   script:
     - pip install bandit
-    - bandit -r app/ || true 
-  allow_failure: true
+    - bandit -r app/ || true
 
-# 3. SONARCLOUD SCAN
 sonarqube_check:
   stage: sast
   image: 
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
-  needs:
-    - job: unit_test
-      artifacts: true
-  variables:
-    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
-    GIT_DEPTH: "0"
+  tags:
+    - wsl-local
+  needs: ["unit_test"]
   script:
     - >
       sonar-scanner 
@@ -53,44 +49,38 @@ sonarqube_check:
       -Dsonar.projectKey=kikyputraa_devops-playground
       -Dsonar.organization=kikyputraa
       -Dsonar.branch.name=$CI_COMMIT_BRANCH
-  allow_failure: true
 
-# 4. DOCKER BUILD
 build_job:
   stage: build
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
+  tags:
+    - wsl-local
   script:
     - docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
     - docker save $DOCKER_IMAGE:$IMAGE_TAG > app_image.tar
   artifacts:
     paths:
       - app_image.tar
-    expire_in: 1 hour
 
-# 5. TRIVY SCAN
 trivy_scan:
   stage: security_check
   image: 
     name: aquasec/trivy:latest
     entrypoint: [""]
-  dependencies:
-    - build_job
+  tags:
+    - wsl-local
   script:
     - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 0
-  allow_failure: true
 
-# 6. PUSH TO DOCKER HUB
 push_job:
   stage: push
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
-  needs: 
-    - job: build_job
-      artifacts: true
-    - job: trivy_scan
+  tags:
+    - wsl-local
   before_script:
     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
   script:
@@ -99,32 +89,21 @@ push_job:
     - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 7. DEPLOY TO K8S (FIXED CONNECTION)
 deploy_job:
   stage: deploy
   image: alpine:latest
+  tags:
+    - wsl-local
   script:
     - apk add --no-cache sed curl
     - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
-    
-    # Tambahkan konfigurasi Kubeconfig dari Variable CI/CD
     - mkdir -p ~/.kube
-    - cp "$KUBECONFIG_DATA" ~/.kube/config
-    
+    - echo "$KUBECONFIG_DATA" > ~/.kube/config
     - |
-      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
-        NAMESPACE="default"
-      else
-        NAMESPACE="staging"
-      fi
-      
-      # Update manifest
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then NAMESPACE="default"; else NAMESPACE="staging"; fi
       sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml 
-      
-      # Gunakan --kubeconfig jika perlu, atau pastikan context sudah benar
-      kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
-      kubectl apply -f k8s/service.yaml -n $NAMESPACE
+      kubectl apply -f k8s/deployment.yaml -n $NAMESPACE --validate=false
       kubectl rollout restart deployment flask-app-deployment -n $NAMESPACE
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging"'
