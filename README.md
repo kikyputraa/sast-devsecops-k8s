@@ -4,36 +4,39 @@ This project demonstrates the implementation of a modern **DevSecOps** workflow 
 
 ---
 
-### 🏗️ Build & Deployment
-| Platform | Pipeline Status | Context |
+### 🏗️ CI/CD & Registry Dashboard
+| Platform | Status Badge | Context / Branch |
 | :--- | :--- | :--- |
-| **GitLab CI/CD** | [![GitLab Pipeline](https://img.shields.io/gitlab/pipeline-status/kikyputraa/sast-test?branch=staging&label=GitLab%20Pipeline&logo=gitlab&color=orange)](https://gitlab.com/kikyputraa/sast-test/-/pipelines) | `Primary CI/CD` |
-| **GitHub Actions** | [![GitHub Pipeline](https://img.shields.io/github/actions/workflow/status/kikyputraa/devops-playground/pipeline.yml?branch=staging&label=GitHub%20Actions%20Pipeline&logo=github)](https://github.com/kikyputraa/devops-playground/actions) | `Secondary CI/CD` |
-| **Docker Hub** | [![Docker Pulls](https://img.shields.io/docker/pulls/kikyputraa/devops-playground?style=flat&logo=docker&color=2496ed)](https://hub.docker.com/r/kikyputraa/devops-playground) | `Registry` |
-| **Git Activity** | [![Last Commit](https://img.shields.io/github/last-commit/kikyputraa/devops-playground/staging?style=flat&logo=git&logoColor=white)](https://github.com/kikyputraa/devops-playground/commits/staging) | `Staging Branch` |
+| **GitLab CI/CD** | [![GitLab Pipeline](https://img.shields.io/gitlab/pipeline-status/kikyputraa/sast-test?branch=staging&label=GitLab%20Pipeline&logo=gitlab&color=orange)](https://gitlab.com/kikyputraa/sast-test/-/pipelines) | `Primary Pipeline (Staging)` |
+| **GitHub Actions** | [![GitHub Pipeline](https://img.shields.io/github/actions/workflow/status/kikyputraa/devops-playground/pipeline.yml?branch=staging&label=GitHub%20Actions%20Pipeline&logo=github)](https://github.com/kikyputraa/devops-playground/actions) | `Secondary Pipeline (Sync)` |
+| **Docker Hub** | [![Docker Pulls](https://img.shields.io/docker/pulls/kikyputraa/devops-playground?style=flat&logo=docker&color=2496ed)](https://hub.docker.com/r/kikyputraa/devops-playground) | `Container Registry` |
+| **Git Activity** | [![Last Commit](https://img.shields.io/github/last-commit/kikyputraa/devops-playground/staging?style=flat&logo=git&logoColor=white)](https://github.com/kikyputraa/devops-playground/commits/staging) | `Latest Updates` |
 
-### 🛡️ Security & Quality Gate
-> **SAST** (Static Application Security Testing) and **SCA** (Software Composition Analysis) Integrations.
-
-* **Code Quality:** [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kikyputraa_devops-playground&metric=alert_status)](https://sonarcloud.io/dashboard?id=kikyputraa_devops-playground)
-* **Security Scan:** [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=kikyputraa_devops-playground&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=kikyputraa_devops-playground)
-* **Methodology:** ![DevSecOps](https://img.shields.io/badge/DevSecOps-Automated-44cc11?style=flat&logo=shield) ![SAST](https://img.shields.io/badge/SAST-Bandit-00599c?style=flat&logo=python&logoColor=white) ![SCA](https://img.shields.io/badge/SCA-Trivy-red?style=flat&logo=trivy&logoColor=white)
+### 🛡️ Security & Code Quality Gate
+| Audit Type | Metric / Status | Methodology |
+| :--- | :--- | :--- |
+| **Quality Gate** | [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kikyputraa_devops-playground&metric=alert_status)](https://sonarcloud.io/dashboard?id=kikyputraa_devops-playground) | `SonarCloud Analysis` |
+| **Security Scan** | [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=kikyputraa_devops-playground&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=kikyputraa_devops-playground) | `Trivy & Bandit` |
+| **Code Security** | ![Bandit](https://img.shields.io/badge/SAST-Bandit-00599c?style=flat&logo=python) | `SAST` | Static analysis for Python security vulnerabilities. |
+| **Image Security** | ![Trivy](https://img.shields.io/badge/SCA-Trivy-red?style=flat&logo=trivy) | `SCA` | Container vulnerability & misconfiguration scanning. |
+| **Strategy** | ![DevSecOps](https://img.shields.io/badge/DevSecOps-Automated-44cc11?style=flat&logo=shield) | `Shift-Left Security` |
 
 ### 🛠️ Infrastructure & Tech Stack
-| Layer | Technology | Specification |
+| Component | Technology | Specification |
 | :--- | :--- | :--- |
-| **Language** | ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) | `3.11-slim` |
-| **Framework** | ![Flask](https://img.shields.io/badge/Flask-000000?style=flat&logo=flask&logoColor=white) | `Microservices` |
-| **Container** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) | `Containerized` |
-| **Orchestration** | ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat&logo=kubernetes&logoColor=white) | `K3s/Minikube` |
+| **Language** | ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) | `Version 3.11-slim` |
+| **Framework** | ![Flask](https://img.shields.io/badge/Flask-000000?style=flat&logo=flask&logoColor=white) | `Lightweight Microservices` |
+| **Container** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) | `Multi-stage Builds` |
+| **Orchestrator** | ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat&logo=kubernetes&logoColor=white) | `K3s / Minikube Cluster` |
 
-### ⚙️ Infrastructure Resilience
-| Feature | Status | Technology |
+### ⚙️ Kubernetes Resilience & Observability
+| Feature | Efficiency Status | Purpose |
 | :--- | :--- | :--- |
-| **Autoscaling** | ![HPA](https://img.shields.io/badge/HPA-Enabled-orange?style=flat&logo=kubernetes) | `Horizontal Pod Autoscaler` |
+| **Autoscaling** | ![HPA](https://img.shields.io/badge/HPA-Enabled-orange?style=flat&logo=kubernetes) | `CPU-based Auto Scaling` |
 | **Self-Healing** | ![Self-Healing](https://img.shields.io/badge/Infrastructure-Self--Healing-blueviolet?style=flat&logo=kubernetes) | `Liveness & Readiness Probes` |
 | **Availability** | ![Zero-Downtime](https://img.shields.io/badge/Deployment-Zero--Downtime-brightgreen?style=flat&logo=target) | `Rolling Update Strategy` |
-| **Monitoring** | ![Metrics-Server](https://img.shields.io/badge/Monitoring-Metrics--Server-9431d4?style=flat&logo=kubernetes) | `Resource Metrics API` |
+| **Traffic Management** | ![Ingress](https://img.shields.io/badge/Ingress-Nginx-informational?style=flat&logo=nginx) | `Host-based Routing` |
+
 
 ## 📋 Prerequisites
 
