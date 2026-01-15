@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run Tests
         run: |
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov --break-system-packages
           pytest --cov=app --cov-report=xml tests/
       - name: Upload Coverage Artifact
         uses: actions/upload-artifact@v4
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run Bandit
         run: |
-          pip install bandit
+          pip install bandit --break-system-packages
           bandit -r app/ || true
 
   sonarqube_check:
@@ -103,8 +103,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Deploy to Kubernetes
         run: |
-          NAMESPACE="${{ github.ref_name == 'main' && 'default' || 'staging' }}"
+          # Logika Namespace dan Port otomatis
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            NAMESPACE="default"
+            PORT="30001"
+          else
+            NAMESPACE="staging"
+            PORT="30002"
+          fi
+
+          # Update Manifest teks (logika 2 hari lalu)
           sed -i "s|image:.*|image: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}|g" k8s/deployment.yaml
+          sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yaml
+          
+          # Eksekusi Apply ke Cluster (logika hari ini)
           kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
           kubectl apply -f k8s/service.yaml -n $NAMESPACE
+          
+          # Force Update Pods
           kubectl rollout restart deployment flask-app-deployment -n $NAMESPACE
+          
+          echo "🚀 Berhasil deploy ke $NAMESPACE di port $PORT"

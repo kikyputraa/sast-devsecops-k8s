@@ -2,58 +2,20 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: flask-app-deployment
-  namespace: staging
   labels:
-    app: flask-web
+    app: flask-app
 spec:
   replicas: 2
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
-      app: flask-web
+      app: flask-app
   template:
     metadata:
       labels:
-        app: flask-web
+        app: flask-app
     spec:
-      automountServiceAccountToken: false
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 2000
       containers:
       - name: flask-app
-        image: kikyputraa/devops-playground:latest
-        imagePullPolicy: Always
+        image: kikyputraa/devops-playground:latest # Akan diganti otomatis oleh sed di pipeline
         ports:
         - containerPort: 5000
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 5000
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 5000
-          initialDelaySeconds: 15
-          periodSeconds: 10
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "100m"
-            ephemeral-storage: "100Mi"
-          limits:
-            memory: "128Mi"
-            cpu: "200m"
-            ephemeral-storage: "200Mi"
