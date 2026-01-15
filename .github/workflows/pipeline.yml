@@ -9,11 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Bandit Security Scan
-        run: |
-          pip install bandit
-          # Menggunakan -ll agar pipeline tidak stop pada isu Medium (seperti binding 0.0.0.0)
-          bandit -r app/ -ll
+      - run: pip install bandit && bandit -r app/ -ll
 
   unit_test:
     runs-on: ubuntu-latest
@@ -35,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Penting untuk akurasi data SonarCloud
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: coverage-report
@@ -50,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build & Save Image
+      - name: Build and Save
         run: |
           docker build -t kikyputraa/devops-playground:${{ github.sha }} .
           docker save kikyputraa/devops-playground:${{ github.sha }} > app_image.tar
@@ -72,7 +68,8 @@ jobs:
           input: 'app_image.tar'
           severity: 'CRITICAL,HIGH'
           exit-code: '1'
-          ignore-unfixed: true # Agar tidak gagal pada celah yang belum ada patch resminya
+          ignore-unfixed: true # Melewati celah yang belum ada solusinya
+          vuln-type: 'os,library'
 
   push_image:
     needs: [container_security]
@@ -81,8 +78,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: docker-artifact
-      - name: Push to Docker Hub
-        run: |
+      - run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           docker load < app_image.tar
           docker push kikyputraa/devops-playground:${{ github.sha }}
@@ -94,13 +90,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Update K8s Manifests
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            NSP="default"; PT="30001"
-          else
-            NSP="staging"; PT="30002"
-          fi
+      - run: |
+          [[ "${{ github.ref }}" == "refs/heads/main" ]] && (NSP="default"; PT="30001") || (NSP="staging"; PT="30002")
           sed -i "s|namespace:.*|namespace: $NSP|g" k8s/deployment.yaml
           sed -i "s|nodePort:.*|nodePort: $PT|g" k8s/service.yaml
           sed -i "s|image:.*|image: kikyputraa/devops-playground:${{ github.sha }}|g" k8s/deployment.yaml
