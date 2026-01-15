@@ -17,21 +17,24 @@ This project demonstrates the implementation of a modern **DevSecOps** workflow 
 
 * **Code Quality:** [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kikyputraa_devops-playground&metric=alert_status)](https://sonarcloud.io/dashboard?id=kikyputraa_devops-playground)
 * **Security Scan:** [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=kikyputraa_devops-playground&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=kikyputraa_devops-playground)
-* **Methodology:** ![DevSecOps](https://img.shields.io/badge/DevSecOps-Automated-44cc11?style=flat&logo=shield) ![SAST](https://img.shields.io/badge/SAST-Bandit-00599c?style=flat&logo=python&logoColor=white) ![Container Scan](https://img.shields.io/badge/SCA-Trivy-red?style=flat&logo=trivy&logoColor=white)
+* **Methodology:** ![DevSecOps](https://img.shields.io/badge/DevSecOps-Automated-44cc11?style=flat&logo=shield) ![SAST](https://img.shields.io/badge/SAST-Bandit-00599c?style=flat&logo=python&logoColor=white) ![SCA](https://img.shields.io/badge/SCA-Trivy-red?style=flat&logo=trivy&logoColor=white)
 
 ### 🛠️ Infrastructure & Tech Stack
-![Python](https://img.shields.io/badge/Python-3.11--slim-3776AB?style=flat&logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Framework-Flask-000000?style=flat&logo=flask&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s/Minikube-326CE5?style=flat&logo=kubernetes&logoColor=white)
+| Layer | Technology | Specification |
+| :--- | :--- | :--- |
+| **Language** | ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) | `3.11-slim` |
+| **Framework** | ![Flask](https://img.shields.io/badge/Flask-000000?style=flat&logo=flask&logoColor=white) | `Microservices` |
+| **Container** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) | `Containerized` |
+| **Orchestration** | ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat&logo=kubernetes&logoColor=white) | `K3s/Minikube` |
 
-### ⚙️ Infrastructure Resilience (Kubernetes)
+### ⚙️ Infrastructure Resilience
 | Feature | Status | Technology |
 | :--- | :--- | :--- |
-| **Autoscaling** | ![HPA](https://img.shields.io/badge/HPA-Enabled-orange?style=flat&logo=kubernetes) | Horizontal Pod Autoscaler |
-| **Resilience** | ![Self-Healing](https://img.shields.io/badge/Infrastructure-Self--Healing-blueviolet?style=flat&logo=kubernetes) | Liveness & Readiness Probes |
-| **Availability** | ![Zero-Downtime](https://img.shields.io/badge/Deployment-Zero--Downtime-brightgreen?style=flat&logo=target) | Rolling Update Strategy |
-| **Monitoring** | ![Metrics-Server](https://img.shields.io/badge/Monitoring-Metrics--Server-9431d4?style=flat&logo=kubernetes) | Resource Metrics API |
+| **Autoscaling** | ![HPA](https://img.shields.io/badge/HPA-Enabled-orange?style=flat&logo=kubernetes) | `Horizontal Pod Autoscaler` |
+| **Self-Healing** | ![Self-Healing](https://img.shields.io/badge/Infrastructure-Self--Healing-blueviolet?style=flat&logo=kubernetes) | `Liveness & Readiness Probes` |
+| **Availability** | ![Zero-Downtime](https://img.shields.io/badge/Deployment-Zero--Downtime-brightgreen?style=flat&logo=target) | `Rolling Update Strategy` |
+| **Monitoring** | ![Metrics-Server](https://img.shields.io/badge/Monitoring-Metrics--Server-9431d4?style=flat&logo=kubernetes) | `Resource Metrics API` |
+
 ## 📋 Prerequisites
 
 To run this project from development to automated deployment, you will need the following components:
