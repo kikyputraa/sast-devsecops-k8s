@@ -15,3 +15,4 @@
 - (15/01) **WSL2-Windows Network Bridging:** Resolved complex network isolation issues by implementing `minikube tunnel` and local DNS loopback mapping, enabling seamless access from host browsers to the cluster.
 - (15/01) **Standardized Service Architecture:** Refactored service networking from `NodePort` to `ClusterIP` to enforce a centralized entry point through the Ingress gateway, enhancing security and traffic management.
 - (15/01) **Observability Foundation:** Initiated the deployment of the Prometheus & Grafana stack via Helm to establish a professional monitoring and alerting infrastructure.
+- (15/01) **Vulnerability Mitigation Strategy:** Implemented .trivyignore and Dockerfile constraint hardening to resolve persistent false positives in vendorized library metadata (jaraco.context), ensuring clean production images.

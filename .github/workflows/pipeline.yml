@@ -5,119 +5,85 @@ on:
     branches: [ "staging", "main" ]
 
 jobs:
-  # 1. SAST Bandit
   sast_bandit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run Bandit Scan
-        run: |
-          pip install bandit
-          bandit -r app/
+      - run: pip install bandit && bandit -r app/
 
-  # 2. Unit Testing
   unit_test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run Pytest
-        run: |
+      - run: |
           pip install pytest pytest-cov
           pytest --cov=app --cov-report=xml tests/
-      - name: Upload Coverage Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: coverage-xml
+          name: coverage-report
           path: coverage.xml
 
-  # 3. SonarCloud Check
   sonarqube_check:
     needs: [unit_test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Download Coverage Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage-xml
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        with: { fetch-depth: 0 }
+      - uses: actions/download-artifact@v4
+        with: { name: coverage-report }
+      - uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # 4. Build Job
   build_job:
     needs: [sonarqube_check, sast_bandit]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Docker Image
-        run: |
+      - run: |
           docker build -t kikyputraa/sast-scan-test:${{ github.sha }} .
           docker save kikyputraa/sast-scan-test:${{ github.sha }} > app_image.tar
-      - name: Upload Image Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-image
-          path: app_image.tar
+      - uses: actions/upload-artifact@v4
+        with: { name: app-image, path: app_image.tar }
 
-  # 5. Security Check (Trivy) - VERSI FIX
   security_check:
     needs: [build_job]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4 # Penting agar file .trivyignore terbaca oleh Trivy
-
-      - name: Download Image Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-image
-
-      - name: Trivy Scan
-        uses: aquasecurity/trivy-action@master
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: app-image }
+      - uses: aquasecurity/trivy-action@master
         with:
           input: 'app_image.tar'
           format: 'table'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
-          # Trivy secara default mencari file .trivyignore di root direktori
-          
-  # 6. Push Job
+          vuln-type: 'os,library'
+          pkg-types: 'library'
+
   push_job:
     needs: [security_check]
     runs-on: ubuntu-latest
     steps:
-      - name: Download Image Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-image
-      - name: Login and Push to Docker Hub
-        run: |
+      - uses: actions/download-artifact@v4
+        with: { name: app-image }
+      - run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           docker load < app_image.tar
           docker push kikyputraa/sast-scan-test:${{ github.sha }}
           docker tag kikyputraa/sast-scan-test:${{ github.sha }} kikyputraa/sast-scan-test:latest
           docker push kikyputraa/sast-scan-test:latest
 
-  # 7. Deploy Job
   deploy_job:
     needs: [push_job]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Update Manifests Simulation
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            NAMESPACE="default"; PORT="30001"
-          else
-            NAMESPACE="staging"; PORT="30002"
-          fi
-          sed -i "s|namespace:.*|namespace: $NAMESPACE|g" k8s/deployment.yaml
-          sed -i "s|nodePort:.*|nodePort: $PORT|g" k8s/service.yaml
-          sed -i "s|image:.*|image: kikyputraa/sast-scan-test:${{ github.sha }}|g" k8s/deployment.yaml
-          echo "Deployment logic verified for $NAMESPACE"
+      - run: |
+          [[ "${{ github.ref }}" == "refs/heads/main" ]] && (NSP="default"; PT="30001") || (NSP="staging"; PT="30002")
+          sed -i "s|namespace:.*|namespace: $NSP|g" k8s/deployment.yaml
+          sed -i "s|nodePort:.*|nodePort: $PT|g" k8s/service.yaml
+          sed -i "s|image:.*|image: kikyputraa/sast-scan-test:${{ github.sha }}|g" k8s/deployment.yaml 
