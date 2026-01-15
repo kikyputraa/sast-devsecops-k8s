@@ -7,8 +7,9 @@ RUN apk add --no-cache gcc musl-dev linux-headers
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir --upgrade pip setuptools
-
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --upgrade setuptools jaraco.context
+    
 COPY app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
