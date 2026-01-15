@@ -18,7 +18,7 @@ This project demonstrates the implementation of a modern **DevSecOps** workflow 
 ![Container Scan](https://img.shields.io/badge/SCA-Trivy-red?style=flat&logo=trivy&logoColor=white)
 
 ### 🛠️ Infrastructure & Tech Stack
-![Python](https://img.shields.io/badge/Python-3.9--slim-3776AB?style=flat&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11--slim-3776AB?style=flat&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Framework-Flask-000000?style=flat&logo=flask&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s/Minikube-326CE5?style=flat&logo=kubernetes&logoColor=white)
