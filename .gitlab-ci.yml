@@ -13,10 +13,12 @@ unit_test:
   stage: sast
   image: python:3.9-slim
   script:
-    - pip install pytest pytest-cov
+    - pip install pytest pytest-cov Flask
     - pytest --cov=app --cov-report=xml tests/
   artifacts:
-    paths: [coverage.xml]
+    paths:
+      - coverage.xml
+    expire_in: 1 hour
 
 sonarqube_check:
   stage: sast
@@ -34,7 +36,8 @@ build_job:
     - docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
     - docker save $DOCKER_IMAGE:$IMAGE_TAG > app_image.tar
   artifacts:
-    paths: [app_image.tar]
+    paths:
+      - app_image.tar
 
 trivy_scan:
   stage: security_check

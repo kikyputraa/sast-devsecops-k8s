@@ -9,18 +9,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: pip install bandit && bandit -r app/
+      - name: Bandit Scan
+        run: |
+          pip install bandit
+          bandit -r app/
 
   unit_test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          pip install pytest pytest-cov
+      - name: Pytest with Coverage
+        run: |
+          pip install pytest pytest-cov Flask
           pytest --cov=app --cov-report=xml tests/
-      - uses: actions/upload-artifact@v4
+      - name: Upload Coverage for Sonar
+        uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: coverage-artifact
           path: coverage.xml
 
   sonarqube_check:
@@ -28,10 +33,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: actions/download-artifact@v4
-        with: { name: coverage-report }
-      - uses: SonarSource/sonarcloud-github-action@master
+        with:
+          fetch-depth: 0
+      - name: Download Coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-artifact
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -41,20 +50,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - name: Build and Save Image
+        run: |
           docker build -t kikyputraa/sast-scan-test:${{ github.sha }} .
           docker save kikyputraa/sast-scan-test:${{ github.sha }} > app_image.tar
-      - uses: actions/upload-artifact@v4
-        with: { name: app-image, path: app_image.tar }
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-image
+          path: app_image.tar
 
   security_check:
     needs: [build_job]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { name: app-image }
-      - uses: aquasecurity/trivy-action@master
+      - name: Download Image
+        uses: actions/download-artifact@v4
+        with:
+          name: app-image
+      - name: Trivy Scan
+        uses: aquasecurity/trivy-action@master
         with:
           input: 'app_image.tar'
           format: 'table'
@@ -68,9 +84,12 @@ jobs:
     needs: [security_check]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
-        with: { name: app-image }
-      - run: |
+      - name: Download Image
+        uses: actions/download-artifact@v4
+        with:
+          name: app-image
+      - name: Login and Push
+        run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           docker load < app_image.tar
           docker push kikyputraa/sast-scan-test:${{ github.sha }}
@@ -82,8 +101,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - name: Manifest Update
+        run: |
           [[ "${{ github.ref }}" == "refs/heads/main" ]] && (NSP="default"; PT="30001") || (NSP="staging"; PT="30002")
           sed -i "s|namespace:.*|namespace: $NSP|g" k8s/deployment.yaml
           sed -i "s|nodePort:.*|nodePort: $PT|g" k8s/service.yaml
-          sed -i "s|image:.*|image: kikyputraa/sast-scan-test:${{ github.sha }}|g" k8s/deployment.yaml 
+          sed -i "s|image:.*|image: kikyputraa/sast-scan-test:${{ github.sha }}|g" k8s/deployment.yaml
