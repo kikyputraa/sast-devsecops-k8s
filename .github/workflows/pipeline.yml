@@ -1,58 +1,51 @@
-name: DevSecOps Full Pipeline
+name: DevSecOps Pipeline
 
 on:
   push:
     branches: [ "main", "staging" ]
 
 jobs:
-  # 1. Static Analysis (Security check di level kode)
   sast_bandit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: pip install bandit && bandit -r app/
 
-  # 2. Unit Testing & Coverage (Kunci buat Sonar)
   unit_test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run Pytest
+      - name: Run Tests
         run: |
           pip install pytest pytest-cov Flask
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           pytest --cov=app --cov-report=xml:coverage.xml tests/
-      - name: Upload Coverage
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
 
-  # 3. SonarCloud Analysis (Quality Gate)
   sonarqube_check:
-    needs: [unit_test]
+    needs: [sast_bandit, unit_test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Download Coverage
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: coverage-report
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+      - uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # 4. Build Docker Image
   build_image:
-    needs: [sonarqube_check, sast_bandit]
+    needs: [sonarqube_check]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build and Save
+      - name: Build Image
         run: |
           docker build -t kikyputraa/devops-playground:${{ github.sha }} .
           docker save kikyputraa/devops-playground:${{ github.sha }} > app_image.tar
@@ -61,7 +54,6 @@ jobs:
           name: docker-artifact
           path: app_image.tar
 
-  # 5. Container Security Scan (Trivy)
   container_security:
     needs: [build_image]
     runs-on: ubuntu-latest
@@ -69,16 +61,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: docker-artifact
-      - name: Trivy Scan
-        uses: aquasecurity/trivy-action@master
+      - uses: aquasecurity/trivy-action@master
         with:
           input: 'app_image.tar'
-          format: 'table'
-          exit-code: '1'
           severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
+          exit-code: '1'
 
-  # 6. Push to Docker Hub
   push_image:
     needs: [container_security]
     runs-on: ubuntu-latest
@@ -86,27 +74,20 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: docker-artifact
-      - name: Login & Push
-        run: |
+      - run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           docker load < app_image.tar
           docker push kikyputraa/devops-playground:${{ github.sha }}
           docker tag kikyputraa/devops-playground:${{ github.sha }} kikyputraa/devops-playground:latest
           docker push kikyputraa/devops-playground:latest
 
-  # 7. Deployment Preparation
   deploy:
     needs: [push_image]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Update K8s Manifests
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            NSP="default"; PT="30001"
-          else
-            NSP="staging"; PT="30002"
-          fi
+      - run: |
+          [[ "${{ github.ref }}" == "refs/heads/main" ]] && (NSP="default"; PT="30001") || (NSP="staging"; PT="30002")
           sed -i "s|namespace:.*|namespace: $NSP|g" k8s/deployment.yaml
           sed -i "s|nodePort:.*|nodePort: $PT|g" k8s/service.yaml
           sed -i "s|image:.*|image: kikyputraa/devops-playground:${{ github.sha }}|g" k8s/deployment.yaml

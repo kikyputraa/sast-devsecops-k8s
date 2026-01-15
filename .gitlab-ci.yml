@@ -8,7 +8,9 @@ stages:
 
 variables:
   DOCKER_IMAGE: "kikyputraa/devops-playground"
+  GIT_DEPTH: "0"
 
+# --- STAGE: SAST ---
 sast_bandit:
   stage: sast
   image: python:3.9-slim
@@ -16,6 +18,7 @@ sast_bandit:
     - pip install bandit
     - bandit -r app/
 
+# --- STAGE: TEST ---
 unit_test:
   stage: test
   image: python:3.9-slim
@@ -31,8 +34,9 @@ sonarqube_check:
   image: { name: sonarsource/sonar-scanner-cli:latest, entrypoint: [""] }
   needs: [unit_test]
   script:
-    - sonar-scanner -Dsonar.token=$SONAR_TOKEN -Dsonar.python.coverage.reportPaths=coverage.xml
+    - sonar-scanner -Dsonar.token=$SONAR_TOKEN -Dsonar.python.coverage.reportPaths=coverage.xml -Dsonar.python.version=3.9
 
+# --- STAGE: BUILD ---
 build_job:
   stage: build
   image: docker:24.0.5
@@ -43,18 +47,20 @@ build_job:
   artifacts:
     paths: [image.tar]
 
+# --- STAGE: SECURITY ---
 trivy_scan:
   stage: security
   image: { name: aquasec/trivy:latest, entrypoint: [""] }
   needs: [build_job]
   script:
-    - trivy image --input image.tar --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed --ignorefile .trivyignore
+    - trivy image --input image.tar --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed
 
+# --- STAGE: PUSH ---
 push_job:
   stage: push
   image: docker:24.0.5
   services: [docker:24.0.5-dind]
-  needs: [build_job, trivy_scan]
+  needs: [trivy_scan]
   script:
     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
     - docker load < image.tar
@@ -62,6 +68,7 @@ push_job:
     - docker tag $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
+# --- STAGE: DEPLOY ---
 deploy_job:
   stage: deploy
   image: alpine:latest
