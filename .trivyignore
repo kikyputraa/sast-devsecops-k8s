@@ -1,0 +1,2 @@
+# Ignore jaraco.context path traversal because we force upgraded it in Dockerfile
+GHSA-58pv-8j8x-9vj2

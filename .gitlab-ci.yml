@@ -48,7 +48,8 @@ trivy_scan:
   image: { name: aquasec/trivy:latest, entrypoint: [""] }
   needs: ["build_job"]
   script:
-    - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed --pkg-types library
+    # Menambahkan flag --ignorefile agar lebih eksplisit
+    - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed --ignorefile .trivyignore
 
 push_job:
   stage: push

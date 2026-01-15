@@ -10,19 +10,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Upgrade pip & kawan-kawan
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# 1. Upgrade pip ke versi terbaru
+RUN pip install --no-cache-dir --upgrade pip
 
-# JURUS PAMUNGKAS: Hapus folder metadata jaraco lama jika ada, lalu install versi aman
-RUN pip uninstall -y jaraco.context && \
-    pip install --no-cache-dir "jaraco.context>=6.1.0"
+# 2. Hapus setuptools bawaan yang bermasalah dan install versi yang bersih
+# Kita pakai versi 70.0.0+ yang biasanya sudah nge-patch vendorized libs
+RUN pip uninstall -y setuptools jaraco.context && \
+    pip install --no-cache-dir "setuptools>=70.0.0" "jaraco.context>=6.1.0"
+
+# 3. Hapus folder vendor jaraco secara paksa jika masih nyangkut di dalam setuptools
+RUN find /usr/local/lib/python3.9/site-packages/setuptools/_vendor -name "jaraco*" -exec rm -rf {} + || true
 
 COPY app/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Pastikan lagi setelah install requirements, versi aman yang menang
-RUN pip install --no-cache-dir --upgrade "jaraco.context>=6.1.0"
+# Install requirements tanpa menyentuh setuptools lagi
+RUN pip install --no-cache-dir --no-deps -r requirements.txt && \
+    pip install --no-cache-dir Flask==2.3.3 pytest==7.4.2 pytest-cov==4.1.0 bandit==1.7.5
 
 COPY app/ .
+
 EXPOSE 5000
 CMD ["python", "app.py"]

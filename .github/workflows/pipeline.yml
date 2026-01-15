@@ -69,11 +69,15 @@ jobs:
     needs: [build_job]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Penting agar file .trivyignore terbaca oleh Trivy
+
       - name: Download Image Artifact
         uses: actions/download-artifact@v4
         with:
           name: app-image
-      - name: Trivy Scan (Focus on Fixable Library)
+
+      - name: Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
           input: 'app_image.tar'
@@ -81,10 +85,8 @@ jobs:
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          # Kunci utama: hanya scan library aktif untuk hindari metadata sampah
-          pkg-types: 'library'
-
+          # Trivy secara default mencari file .trivyignore di root direktori
+          
   # 6. Push Job
   push_job:
     needs: [security_check]
