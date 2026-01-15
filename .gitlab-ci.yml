@@ -1,102 +1,74 @@
 stages:
   - sast
+  - test
   - build
-  - security_check
+  - security
   - push
   - deploy
 
 variables:
-  # UPDATE: Nama Image baru sesuai repo lu
   DOCKER_IMAGE: "kikyputraa/devops-playground"
-  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
 
-# 1. UNIT TEST & COVERAGE
-unit_test:
+sast_bandit:
   stage: sast
   image: python:3.9-slim
   script:
-    - pip install pytest pytest-cov Flask
-    # Paksa generate coverage ke root agar bisa dibaca stage selanjutnya
-    - pytest --cov=app --cov-report=xml:coverage.xml tests/
-    - ls -la coverage.xml # Verifikasi file tercipta
-  artifacts:
-    paths:
-      - coverage.xml
-    expire_in: 1 hour
+    - pip install bandit
+    - bandit -r app/
 
-# 2. SONARCLOUD SCAN
-sonarqube_check:
-  stage: sast
-  image: 
-    name: sonarsource/sonar-scanner-cli:latest
-    entrypoint: [""]
-  needs: ["unit_test"]
-  variables:
-    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
-    GIT_DEPTH: "0"
+unit_test:
+  stage: test
+  image: python:3.9-slim
   script:
-    - sonar-scanner 
-      -Dsonar.projectKey=kikyputraa_devops-playground 
-      -Dsonar.organization=kikyputraa 
-      -Dsonar.sources=app 
-      -Dsonar.tests=tests 
-      -Dsonar.python.coverage.reportPaths=coverage.xml 
-      -Dsonar.token=$SONAR_TOKEN
-  allow_failure: true
+    - pip install pytest pytest-cov Flask
+    - export PYTHONPATH=$PYTHONPATH:$(pwd)
+    - pytest --cov=app --cov-report=xml:coverage.xml tests/
+  artifacts:
+    paths: [coverage.xml]
 
-# 3. BUILD IMAGE
+sonarqube_check:
+  stage: test
+  image: { name: sonarsource/sonar-scanner-cli:latest, entrypoint: [""] }
+  needs: [unit_test]
+  script:
+    - sonar-scanner -Dsonar.token=$SONAR_TOKEN -Dsonar.python.coverage.reportPaths=coverage.xml
+
 build_job:
   stage: build
   image: docker:24.0.5
-  services:
-    - docker:24.0.5-dind
+  services: [docker:24.0.5-dind]
   script:
-    - docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
-    - docker save $DOCKER_IMAGE:$IMAGE_TAG > app_image.tar
+    - docker build -t $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA .
+    - docker save $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA > image.tar
   artifacts:
-    paths:
-      - app_image.tar
+    paths: [image.tar]
 
-# 4. SECURITY SCAN (TRIVY)
 trivy_scan:
-  stage: security_check
-  image: 
-    name: aquasec/trivy:latest
-    entrypoint: [""]
-  needs: ["build_job"]
+  stage: security
+  image: { name: aquasec/trivy:latest, entrypoint: [""] }
+  needs: [build_job]
   script:
-    # Gunakan .trivyignore untuk bypass jaraco.context
-    - trivy image --input app_image.tar --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed --pkg-types library --ignorefile .trivyignore
+    - trivy image --input image.tar --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed --ignorefile .trivyignore
 
-# 5. PUSH TO DOCKER HUB
 push_job:
   stage: push
   image: docker:24.0.5
-  services:
-    - docker:24.0.5-dind
-  needs: ["build_job", "trivy_scan"]
-  before_script:
-    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+  services: [docker:24.0.5-dind]
+  needs: [build_job, trivy_scan]
   script:
-    - docker load < app_image.tar
-    - docker push $DOCKER_IMAGE:$IMAGE_TAG
-    - docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+    - docker load < image.tar
+    - docker push $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker tag $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA $DOCKER_IMAGE:latest
     - docker push $DOCKER_IMAGE:latest
 
-# 6. DEPLOY TO KUBERNETES
 deploy_job:
   stage: deploy
   image: alpine:latest
   script:
     - apk add --no-cache sed
     - |
-      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
-        NSP="default"; PT="30001"
-      else
-        NSP="staging"; PT="30002"
-      fi
-      # Update namespace, port, dan IMAGE NAME di manifest
+      [[ "$CI_COMMIT_BRANCH" == "main" ]] && (NSP="default"; PT="30001") || (NSP="staging"; PT="30002")
       sed -i "s|namespace:.*|namespace: $NSP|g" k8s/deployment.yaml
       sed -i "s|nodePort:.*|nodePort: $PT|g" k8s/service.yaml
-      sed -i "s|image:.*|image: $DOCKER_IMAGE:$IMAGE_TAG|g" k8s/deployment.yaml
-      echo "Deployed $DOCKER_IMAGE:$IMAGE_TAG to $NSP"
+      sed -i "s|image:.*|image: $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA|g" k8s/deployment.yaml
